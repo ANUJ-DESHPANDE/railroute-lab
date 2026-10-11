@@ -89,7 +89,7 @@ def qa(pdf, q, a, y):
 
 def make_pdf():
     graph, _ = generate_map(DEFAULT_SEED)
-    start, goal = "Science Hall", "North Library"
+    start, goal = "A", "D"
     off = astar(graph, start, goal, "12:00")
     morning = astar(graph, start, goal, "08:30")
     closed = astar(graph, start, goal, "12:00", {WEST_TUNNEL})
@@ -136,7 +136,7 @@ def make_pdf():
         "6. If the heap empties, report no route and retain the exploration trace.",
     ):
         y = paragraph(pdf, escape(line), y, small, gap=2)
-    y = heading(pdf, "Real run: seed 17, Science Hall to North Library, 12:00", y + 1)
+    y = heading(pdf, "Real run: seed 17, A to D, 12:00", y + 1)
     y = paragraph(pdf, "The first four A* expansions below are read from the running program (minutes):", y, small, gap=4)
     pdf.setFont("Helvetica-Bold", 8.3)
     pdf.setFillColor(TEAL)
@@ -166,7 +166,7 @@ def make_pdf():
         ("12:00, west shut", closed),
     )
     for label, result in scenarios:
-        tunnel = "west" if "West Tunnel South" in result.path else "east"
+        tunnel = "west" if "B" in result.path else "east"
         y = row(pdf, label, f"{tunnel} tunnel; {result.travel_seconds / 60:.2f} min; {result.nodes_expanded} A* expansions", y, 133)
     y = paragraph(pdf, "At 12:00 the shorter west crossing wins. In the modeled morning peak, its congested approach loses to the east crossing. Closing west forces the east route. Closing both makes a north/south trip unreachable; the UI still shows the nodes explored before the frontier emptied.", y - 1)
     y = heading(pdf, "What was actually checked", y)

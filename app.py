@@ -90,8 +90,8 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
         if parsed.path == "/api/route":
-            start = query.get("start", ["Science Hall"])[0]
-            goal = query.get("goal", ["North Library"])[0]
+            start = query.get("start", ["A"])[0]
+            goal = query.get("goal", ["D"])[0]
             departure = query.get("departure", ["12:00"])[0]
             closed_names = query.get("closed", [])
             unknown = set(closed_names) - set(TUNNELS)

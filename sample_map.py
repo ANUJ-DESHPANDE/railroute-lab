@@ -14,45 +14,45 @@ from routing import CampusGraph
 
 
 DEFAULT_SEED = 17
-WEST_TUNNEL = ("West Tunnel South", "West Tunnel North")
-EAST_TUNNEL = ("East Tunnel South", "East Tunnel North")
+WEST_TUNNEL = ("B", "C")
+EAST_TUNNEL = ("F", "G")
 
 # x = east, y = north, in an abstract kilometre-scale coordinate frame.
 BASE_LOCATIONS = (
-    ("West Entrance", 0.08, -0.57, "stop"),
-    ("Design Studio", 0.28, -0.41, "stop"),
-    ("Science Hall", 0.55, -0.20, "stop"),
-    ("East Lecture Hall", 0.94, -0.19, "stop"),
-    ("Innovation Lab", 1.34, -0.19, "stop"),
-    ("Admin Center", 1.38, -0.01, "stop"),
-    ("Maple Residence", 0.25, 0.55, "stop"),
-    ("Cedar Residence", 0.43, 0.76, "stop"),
-    ("North Library", 1.02, 0.61, "stop"),
-    ("Birch Residence", 1.27, 0.43, "stop"),
-    ("West Tunnel South", 0.45, -0.06, "junction"),
-    ("West Tunnel North", 0.45, 0.25, "junction"),
-    ("East Tunnel South", 1.18, -0.01, "junction"),
-    ("East Tunnel North", 1.18, 0.27, "junction"),
+    ("J", 0.08, -0.57, "stop"),
+    ("I", 0.28, -0.41, "stop"),
+    ("A", 0.55, -0.20, "stop"),
+    ("E", 0.94, -0.19, "stop"),
+    ("K", 1.34, -0.19, "stop"),
+    ("L", 1.38, -0.01, "stop"),
+    ("M", 0.25, 0.55, "stop"),
+    ("N", 0.43, 0.76, "stop"),
+    ("D", 1.02, 0.61, "stop"),
+    ("H", 1.27, 0.43, "stop"),
+    ("B", 0.45, -0.06, "junction"),
+    ("C", 0.45, 0.25, "junction"),
+    ("F", 1.18, -0.01, "junction"),
+    ("G", 1.18, 0.27, "junction"),
 )
 
 ROADS = (
-    ("West Entrance", "Design Studio", "central"),
-    ("Design Studio", "Science Hall", "central"),
-    ("Science Hall", "East Lecture Hall", "central"),
-    ("East Lecture Hall", "Innovation Lab", "moderate"),
-    ("Innovation Lab", "Admin Center", "moderate"),
-    ("Admin Center", "East Tunnel South", "moderate"),
-    ("East Lecture Hall", "East Tunnel South", "quiet"),
-    ("Science Hall", "West Tunnel South", "central"),
-    ("Design Studio", "West Tunnel South", "central"),
-    ("West Tunnel South", "West Tunnel North", "central"),
-    ("East Tunnel South", "East Tunnel North", "quiet"),
-    ("West Tunnel North", "Maple Residence", "central"),
-    ("Maple Residence", "Cedar Residence", "moderate"),
-    ("Cedar Residence", "North Library", "moderate"),
-    ("North Library", "Birch Residence", "quiet"),
-    ("Birch Residence", "East Tunnel North", "quiet"),
-    ("West Tunnel North", "North Library", "moderate"),
+    ("J", "I", "central"),
+    ("I", "A", "central"),
+    ("A", "E", "central"),
+    ("E", "K", "moderate"),
+    ("K", "L", "moderate"),
+    ("L", "F", "moderate"),
+    ("E", "F", "quiet"),
+    ("A", "B", "central"),
+    ("I", "B", "central"),
+    ("B", "C", "central"),
+    ("F", "G", "quiet"),
+    ("C", "M", "central"),
+    ("M", "N", "moderate"),
+    ("N", "D", "moderate"),
+    ("D", "H", "quiet"),
+    ("H", "G", "quiet"),
+    ("C", "D", "moderate"),
 )
 
 

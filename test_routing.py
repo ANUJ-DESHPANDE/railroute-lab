@@ -28,13 +28,13 @@ class RoutingTests(unittest.TestCase):
 
     def test_default_scenarios_make_the_railway_matter(self) -> None:
         graph, _ = generate_map(DEFAULT_SEED)
-        off_peak = astar(graph, "Science Hall", "North Library", "12:00")
-        morning = astar(graph, "Science Hall", "North Library", "08:30")
-        closed = astar(graph, "Science Hall", "North Library", "12:00", {WEST_TUNNEL})
-        self.assertIn("West Tunnel South", off_peak.path)
-        self.assertIn("East Tunnel South", morning.path)
-        self.assertIn("East Tunnel South", closed.path)
-        self.assertNotIn("West Tunnel South", closed.path)
+        off_peak = astar(graph, "A", "D", "12:00")
+        morning = astar(graph, "A", "D", "08:30")
+        closed = astar(graph, "A", "D", "12:00", {WEST_TUNNEL})
+        self.assertIn("B", off_peak.path)
+        self.assertIn("F", morning.path)
+        self.assertIn("F", closed.path)
+        self.assertNotIn("B", closed.path)
         self.assertEqual(off_peak.nodes_expanded, len(off_peak.expansions))
         self.assertTrue(any(choice.outcome == "queued" for choice in off_peak.expansions[0].neighbors))
         for expansion in off_peak.expansions:
@@ -46,25 +46,25 @@ class RoutingTests(unittest.TestCase):
                              tuple(sorted(item.f_seconds for item in expansion.frontier_after)))
         for current, following in zip(off_peak.expansions, off_peak.expansions[1:]):
             self.assertEqual(current.frontier_after[0].node, following.node)
-        self.assertIsNone(astar(graph, "Science Hall", "North Library", "12:00", {WEST_TUNNEL, EAST_TUNNEL}))
+        self.assertIsNone(astar(graph, "A", "D", "12:00", {WEST_TUNNEL, EAST_TUNNEL}))
         failed_trace = []
-        self.assertIsNone(astar(graph, "Science Hall", "North Library", "12:00", {WEST_TUNNEL, EAST_TUNNEL}, failed_trace))
+        self.assertIsNone(astar(graph, "A", "D", "12:00", {WEST_TUNNEL, EAST_TUNNEL}, failed_trace))
         self.assertGreater(len(failed_trace), 1)
-        self.assertNotIn("North Library", [step.node for step in failed_trace])
+        self.assertNotIn("D", [step.node for step in failed_trace])
         self.assertTrue(any(choice.outcome == "closed" for step in failed_trace for choice in step.neighbors))
 
     def test_reliable_mode_optimizes_declared_small_graph_model(self) -> None:
         graph, _ = generate_map(DEFAULT_SEED)
-        fastest = astar(graph, "Science Hall", "North Library", "12:00")
-        reliable = reliable_route(graph, "Science Hall", "North Library", "12:00")
+        fastest = astar(graph, "A", "D", "12:00")
+        reliable = reliable_route(graph, "A", "D", "12:00")
         self.assertNotEqual(fastest.path, reliable.path)
         self.assertLess(reliable.estimated_p90_seconds, estimated_p90_seconds(graph, fastest.path, "12:00"))
         self.assertGreater(reliable.paths_evaluated, 1)
 
     def test_same_location_and_disconnected_graph(self) -> None:
         graph, _ = generate_map(DEFAULT_SEED)
-        result = astar(graph, "Science Hall", "Science Hall", "12:00")
-        self.assertEqual(result.path, ("Science Hall",))
+        result = astar(graph, "A", "A", "12:00")
+        self.assertEqual(result.path, ("A",))
         self.assertEqual(result.travel_seconds, 0)
         disconnected = CampusGraph()
         disconnected.add_location("A", 0, 0)

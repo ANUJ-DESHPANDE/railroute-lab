@@ -14,8 +14,8 @@ from sample_map import DEFAULT_SEED
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--start", default="Science Hall", choices=GRAPH.coordinates)
-    parser.add_argument("--goal", default="North Library", choices=GRAPH.coordinates)
+    parser.add_argument("--start", default="A", choices=GRAPH.coordinates)
+    parser.add_argument("--goal", default="D", choices=GRAPH.coordinates)
     parser.add_argument("--time", default="12:00", help="24-hour HH:MM departure time")
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED, help="Fictional map seed (0–99999)")
     parser.add_argument("--close", action="append", choices=TUNNELS, default=[], help="Close a modeled underpass")

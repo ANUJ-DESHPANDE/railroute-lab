@@ -228,7 +228,7 @@ def make_report():
         "Use departures 07:00, 08:30, 10:00, 12:00, 16:00, and 19:00.",
         "Test all four closure states and every ordered start/goal pair, including same-location and unreachable cases.",
         "Run A* and Dijkstra on identical graph/input data; record reachability, travel cost, and locations expanded.",
-        "Use seed 17, Science Hall to North Library, for human-readable route-switch examples.",
+        "Use seed 17, A to D, for human-readable route-switch examples.",
     ], y)
     y = block(pdf, f"The Cartesian product is <b>5 × 6 × 4 × 14 × 14 = {AGG['cases']:,}</b> cases. The experiment code raises an error if the two methods disagree on reachability or travel time. The separate unit suite covers 43,120 cases using eleven times, including just-before and just-after peak boundaries.", y)
     y = section(pdf, "Measures and interpretation", y)
@@ -250,7 +250,7 @@ def make_report():
                        ("off_peak_both_closed", "12:00 both shut")):
         case = CASES[key]
         path = case["astar_path"]
-        tunnel = "west" if path and "West Tunnel South" in path else "east" if path else "none"
+        tunnel = "west" if path and "B" in path else "east" if path else "none"
         eta = f"{case['astar_minutes']:.2f}" if path else "—"
         expansions = f"{case['astar_expanded']} / {case['dijkstra_expanded']}" if path else "—"
         rows.append((label, tunnel, eta, expansions))
@@ -392,7 +392,7 @@ def make_slides():
     y = slide_text(pdf, 56, y - 5, "The heuristic is admissible because roads are at least straight-line length and never exceed the assumed maximum speed.", 730, 14, 20)
     pdf.showPage()
 
-    sw, sh, y = slide_base(pdf, 4, "A live route decision", "Seed 17: Science Hall to North Library")
+    sw, sh, y = slide_base(pdf, 4, "A live route decision", "Seed 17: A to D")
     rows = [
         ("12:00, both open", CASES["off_peak_open"]),
         ("08:30, both open", CASES["morning_open"]),
@@ -401,7 +401,7 @@ def make_slides():
     ]
     for label, case in rows:
         path = case["astar_path"]
-        tunnel = "WEST" if path and "West Tunnel South" in path else "EAST" if path else "NO ROUTE"
+        tunnel = "WEST" if path and "B" in path else "EAST" if path else "NO ROUTE"
         eta = f"{case['astar_minutes']:.2f} min" if path else "queue exhausted"
         pdf.setFillColor(PALE)
         pdf.roundRect(56, y - 61, sw - 112, 52, 6, fill=1, stroke=0)

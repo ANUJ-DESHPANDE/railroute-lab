@@ -34,8 +34,8 @@ def run_experiment() -> dict:
         ("off_peak_east_closed", "12:00", "east_closed"),
         ("off_peak_both_closed", "12:00", "both_closed"),
     ):
-        a = astar(graph, "Science Hall", "North Library", time, CLOSURES[closure])
-        d = dijkstra(graph, "Science Hall", "North Library", time, CLOSURES[closure])
+        a = astar(graph, "A", "D", time, CLOSURES[closure])
+        d = dijkstra(graph, "A", "D", time, CLOSURES[closure])
         scenarios.append({
             "case": label, "time": time, "closures": closure,
             "astar_path": list(a.path) if a else None,

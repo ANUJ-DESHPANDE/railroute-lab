@@ -1,17 +1,7 @@
 import * as THREE from './vendor/three.module.js';
 
 const $ = (selector) => document.querySelector(selector);
-// Short, stable display IDs make the search trace and the map easy to match.
-// The Python graph continues to use full location names as its node keys.
-const NODE_ORDER = [
-  'Science Hall', 'West Tunnel South', 'West Tunnel North', 'North Library',
-  'East Lecture Hall', 'East Tunnel South', 'East Tunnel North', 'Birch Residence',
-  'Design Studio', 'West Entrance', 'Innovation Lab', 'Admin Center',
-  'Maple Residence', 'Cedar Residence',
-];
-const NODE_IDS = new Map(NODE_ORDER.map((name, index) => [name, String.fromCharCode(65 + index)]));
-const nodeId = (name) => NODE_IDS.get(name) || '?';
-const nodeLabel = (name) => `${nodeId(name)} · ${name}`;
+const nodeLabel = (name) => name;
 let graph = null;
 let routeData = null;
 let seedLoaded = null;
@@ -49,10 +39,9 @@ function setMapLabels() {
   for (const {name} of graph.locations) {
     const element = document.createElement('div');
     element.className = 'map-label map-node-label';
-    const letter = document.createElement('b'); letter.textContent = nodeId(name);
-    const label = document.createElement('span'); label.textContent = name;
+    const letter = document.createElement('b'); letter.textContent = name;
     const role = document.createElement('small');
-    element.append(letter, label, role);
+    element.append(letter, role);
     mapFrame.appendChild(element);
     mapLabels.push({element, name});
   }
@@ -293,7 +282,7 @@ function buildLandmarks() {
     marker.position.copy(position);
     landmarkGroup.add(marker);
     if (junction) return;
-    const residence = location.name.includes('Residence');
+    const residence = ['H', 'M', 'N'].includes(location.name);
     const width = 0.48 + (index % 3) * 0.10;
     const depth = 0.43 + (index % 2) * 0.10;
     const height = 0.42 + (index % 4) * 0.13;
@@ -484,7 +473,7 @@ function showError(message) {
 function populateStops(preserve = true) {
   const formerStart = preserve ? $('#start').value : '';
   const formerGoal = preserve ? $('#goal').value : '';
-  const stops = graph.locations.filter((item) => item.kind === 'stop');
+  const stops = [...graph.locations].sort((a, b) => a.name.localeCompare(b.name));
   for (const select of [$('#start'), $('#goal')]) {
     select.replaceChildren();
     for (const stop of stops) {
@@ -493,8 +482,8 @@ function populateStops(preserve = true) {
       select.appendChild(option);
     }
   }
-  $('#start').value = stops.some((item) => item.name === formerStart) ? formerStart : 'Science Hall';
-  $('#goal').value = stops.some((item) => item.name === formerGoal) ? formerGoal : 'North Library';
+  $('#start').value = stops.some((item) => item.name === formerStart) ? formerStart : 'A';
+  $('#goal').value = stops.some((item) => item.name === formerGoal) ? formerGoal : 'D';
 }
 async function loadMap(seed, preserve = true) {
   const response = await fetch(`/api/graph?seed=${seed}`);
@@ -668,7 +657,7 @@ function updateResults() {
   if (!a) {
     $('#show-final').disabled = true;
     $('#replay').disabled = true;
-    showError('No route exists with these tunnel closures. Reopen a crossing or choose stops on the same side of the railway.');
+    showError('No route exists with these tunnel closures. Reopen a crossing or choose locations on the same side of the railway.');
     $('#eta').textContent = '—';
     $('#verified').textContent = 'No reachable route';
     $('#verified').classList.add('failed');
@@ -701,7 +690,10 @@ function updateResults() {
     const stop = document.createElement('span'); stop.className = 'route-stop'; stop.textContent = nodeLabel(name);
     $('#route-path').appendChild(stop);
   });
-  const tunnel = a.path.includes('West Tunnel South') ? 'west tunnel' : a.path.includes('East Tunnel South') ? 'east tunnel' : null;
+  const crossesTunnel = ([first, second]) => a.path.some((name, index) =>
+    (name === first && a.path[index + 1] === second) || (name === second && a.path[index + 1] === first));
+  const tunnel = crossesTunnel(graph.tunnels.west) ? 'B–C tunnel'
+    : crossesTunnel(graph.tunnels.east) ? 'F–G tunnel' : null;
   $('#route-reason').textContent = tunnel
     ? `Uses the ${tunnel}. Its ${routeData.steps.length} road times add to ${minutes(a.travel_seconds)} minutes.`
     : `This trip stays on one side of the railway. ${routeData.steps.length} road times add to ${minutes(a.travel_seconds)} minutes.`;

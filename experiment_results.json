@@ -28,10 +28,10 @@
       "time": "12:00",
       "closures": "open",
       "astar_path": [
-        "Science Hall",
-        "West Tunnel South",
-        "West Tunnel North",
-        "North Library"
+        "A",
+        "B",
+        "C",
+        "D"
       ],
       "astar_minutes": 8.3,
       "dijkstra_minutes": 8.3,
@@ -43,12 +43,12 @@
       "time": "08:30",
       "closures": "open",
       "astar_path": [
-        "Science Hall",
-        "East Lecture Hall",
-        "East Tunnel South",
-        "East Tunnel North",
-        "Birch Residence",
-        "North Library"
+        "A",
+        "E",
+        "F",
+        "G",
+        "H",
+        "D"
       ],
       "astar_minutes": 12.464,
       "dijkstra_minutes": 12.464,
@@ -60,12 +60,12 @@
       "time": "12:00",
       "closures": "west_closed",
       "astar_path": [
-        "Science Hall",
-        "East Lecture Hall",
-        "East Tunnel South",
-        "East Tunnel North",
-        "Birch Residence",
-        "North Library"
+        "A",
+        "E",
+        "F",
+        "G",
+        "H",
+        "D"
       ],
       "astar_minutes": 9.167,
       "dijkstra_minutes": 9.167,
@@ -77,10 +77,10 @@
       "time": "12:00",
       "closures": "east_closed",
       "astar_path": [
-        "Science Hall",
-        "West Tunnel South",
-        "West Tunnel North",
-        "North Library"
+        "A",
+        "B",
+        "C",
+        "D"
       ],
       "astar_minutes": 8.3,
       "dijkstra_minutes": 8.3,

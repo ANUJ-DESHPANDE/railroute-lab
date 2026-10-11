@@ -56,8 +56,7 @@ h1, h2 { margin-bottom: 0; color: #20343e; font-size: 21px; line-height: 1.1; le
 .map-label:not(.map-label-stop) { color: #3d6069; }
 .map-label-stop { transform: translate(-50%, -165%); }
 .map-node-label { display: flex; align-items: center; gap: 3px; width: max-content; max-width: none; min-height: 21px; padding: 2px 4px 2px 2px; border: 1px solid #c6d7d0; border-radius: 3px; background: #fbfdf9f2; color: #34535a; text-shadow: none; transform: none; box-shadow: 0 1px 4px #3150592c; }
-.map-node-label b { flex: none; display: grid; place-items: center; width: 19px; height: 19px; border-radius: 2px; background: #45656c; color: #fff; font-size: 13px; }
-.map-node-label span { font-size: 9px; font-weight: 700; }
+.map-node-label b { flex: none; display: grid; place-items: center; width: 25px; height: 25px; border-radius: 2px; background: #45656c; color: #fff; font-size: 17px; }
 .map-node-label small { display: inline-block; margin-left: 2px; color: #557b72; font-size: 7px; letter-spacing: .02em; }
 .map-node-label.is-current { z-index: 5; border-color: #2b8580; background: #e7f6ef; }
 .map-node-label.is-current b { background: #167f7c; }
