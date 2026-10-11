@@ -10,7 +10,7 @@ Python 3.10+ is sufficient for the core and browser app. Three.js is bundled loc
 python app.py
 ```
 
-Open **http://127.0.0.1:8000**. Choose start, destination, departure time, map seed, and tunnel closures, then select **Run A* search**. The four panels show exact inputs, the A* expansion trace with `g + h = f`, cost and Dijkstra comparison, and a smaller shuttle animation. **View source** displays the actual Python search code.
+Open **http://127.0.0.1:8000**. Choose start, destination, departure time, map seed, and tunnel closures, then select **Run A* search**. The workspace shows exact inputs, a large route map with synchronized shuttle close-up, the A* expansion trace with `g + h = f`, and the Dijkstra comparison. **View source** displays the actual Python search code.
 
 Code-first review examples:
 

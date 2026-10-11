@@ -5,7 +5,7 @@ const browser = await chromium.launch({
   executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
   headless: true,
 });
-const page = await browser.newPage({viewport: {width: 1440, height: 900}, deviceScaleFactor: 1});
+const page = await browser.newPage({viewport: {width: 1536, height: 690}, deviceScaleFactor: 1});
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
 page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
@@ -14,6 +14,18 @@ page.on('response', (response) => { if (response.status() >= 400) errors.push(`$
 async function run() {
   await page.getByRole('button', {name: /Run A\* search/}).click();
   await page.waitForFunction(() => document.querySelector('#verified')?.textContent?.includes('agree'));
+  const layout = await page.evaluate(() => ({
+    pageHeight: document.documentElement.scrollHeight,
+    viewportHeight: window.innerHeight,
+    mapHeight: document.querySelector('.map-frame').getBoundingClientRect().height,
+    mapBottom: document.querySelector('.map-frame').getBoundingClientRect().bottom,
+    inputsBottom: document.querySelector('.inputs').getBoundingClientRect().bottom,
+    algorithmBottom: document.querySelector('.algorithm').getBoundingClientRect().bottom,
+    evidenceBottom: document.querySelector('.evidence').getBoundingClientRect().bottom,
+  }));
+  assert.ok(layout.pageHeight <= layout.viewportHeight + 1, JSON.stringify(layout));
+  assert.ok(layout.mapHeight > 300, JSON.stringify(layout));
+  assert.ok(Math.max(layout.mapBottom, layout.inputsBottom, layout.algorithmBottom, layout.evidenceBottom) <= layout.viewportHeight + 1, JSON.stringify(layout));
 }
 
 try {
@@ -22,6 +34,25 @@ try {
   assert.match(await page.locator('#route-path').innerText(), /West Tunnel/);
   assert.equal(await page.locator('#astar-time').innerText(), await page.locator('#dijkstra-time').innerText());
   await page.screenshot({path: 'demo-screenshot.png', fullPage: true});
+  assert.equal(await page.locator('#vehicle-focus').isVisible(), true);
+  await page.setViewportSize({width: 1366, height: 650});
+  const compact = await page.evaluate(() => ({
+    scrollHeight: document.documentElement.scrollHeight,
+    viewportHeight: window.innerHeight,
+    noteBottom: document.querySelector('.source-note').getBoundingClientRect().bottom,
+    panelBottom: document.querySelector('.algorithm').getBoundingClientRect().bottom,
+  }));
+  assert.ok(compact.scrollHeight <= compact.viewportHeight + 1, JSON.stringify(compact));
+  assert.ok(compact.noteBottom <= compact.panelBottom + 1, JSON.stringify(compact));
+  await page.setViewportSize({width: 390, height: 844});
+  const mobile = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+    mapHeight: document.querySelector('.map-frame').getBoundingClientRect().height,
+  }));
+  assert.ok(mobile.scrollWidth <= mobile.viewportWidth + 1, JSON.stringify(mobile));
+  assert.ok(mobile.mapHeight > 300, JSON.stringify(mobile));
+  await page.setViewportSize({width: 1536, height: 690});
 
   await page.getByRole('button', {name: /Next expansion/}).click();
   assert.match(await page.locator('#step-count').innerText(), /2 OF/);

@@ -24,6 +24,12 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 sceneHost.appendChild(renderer.domElement);
+const vehicleHost = $('#vehicle-scene');
+const vehicleCamera = new THREE.PerspectiveCamera(43, 1, 0.1, 100);
+const vehicleRenderer = new THREE.WebGLRenderer({antialias: true});
+vehicleRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+vehicleRenderer.outputColorSpace = THREE.SRGBColorSpace;
+vehicleHost.appendChild(vehicleRenderer.domElement);
 const mapFrame = document.querySelector('.map-frame');
 const mapLabels = [];
 
@@ -60,7 +66,7 @@ function positionMapLabels() {
 
 const target = new THREE.Vector3(0, 0, 0);
 let orbitAngle = 0.42;
-let orbitElevation = 1.15;
+let orbitElevation = 1.04;
 let orbitDistance = 23;
 function positionCamera() {
   camera.position.set(
@@ -149,6 +155,14 @@ for (const side of [-1, 1]) {
   );
   windows.position.set(side * 0.367, 0.43, -0.02);
   bus.add(windows);
+  for (const z of [-0.22, 0.23]) {
+    const pillar = new THREE.Mesh(
+      new THREE.BoxGeometry(0.02, 0.19, 0.032),
+      new THREE.MeshStandardMaterial({color: 0xe5e8e2, roughness: 0.6}),
+    );
+    pillar.position.set(side * 0.379, 0.43, z);
+    bus.add(pillar);
+  }
   for (const z of [-0.35, 0.35]) {
     const wheel = new THREE.Mesh(
       new THREE.CylinderGeometry(0.12, 0.12, 0.075, 16),
@@ -170,7 +184,7 @@ for (const x of [-0.25, 0.25]) {
   lamp.position.set(x, 0.28, 0.575);
   bus.add(lamp);
 }
-bus.scale.setScalar(1.25);
+bus.scale.setScalar(1.75);
 bus.visible = false;
 scene.add(bus);
 
@@ -266,6 +280,8 @@ function drawRoute(path) {
   scene.add(routeGroup);
   currentPath = path;
   bus.visible = path.length > 0;
+  $('#vehicle-focus').hidden = !bus.visible;
+  resize();
   animationTime = 0;
   playing = path.length > 1;
   placeBus(0);
@@ -273,7 +289,7 @@ function drawRoute(path) {
 function placeBus(progress) {
   if (!currentPath.length) return;
   if (currentPath.length === 1) {
-    bus.position.copy(point(currentPath[0], 0.16));
+    bus.position.copy(point(currentPath[0], 0.23));
     $('#playback-label').textContent = `At ${currentPath[0]}`;
     return;
   }
@@ -293,7 +309,7 @@ function placeBus(progress) {
   const p = curve.getPoint(Math.min(1, Math.max(0, fraction)));
   const tangent = curve.getTangent(Math.min(0.999, Math.max(0.001, fraction)));
   bus.position.copy(p);
-  bus.position.y += 0.14;
+  bus.position.y += 0.06;
   bus.rotation.y = Math.atan2(tangent.x, tangent.z);
   $('#playback-label').textContent = `${currentPath[index]} → ${currentPath[index + 1]}`;
   $('#progress-fill').style.width = `${Math.round(progress * 100)}%`;
@@ -305,8 +321,15 @@ function resize() {
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
+  const detailWidth = vehicleHost.clientWidth, detailHeight = vehicleHost.clientHeight;
+  if (detailWidth && detailHeight) {
+    vehicleRenderer.setSize(detailWidth, detailHeight, false);
+    vehicleCamera.aspect = detailWidth / detailHeight;
+    vehicleCamera.updateProjectionMatrix();
+  }
 }
 window.addEventListener('resize', resize);
+new ResizeObserver(resize).observe(sceneHost);
 let dragging = false, lastX = 0, lastY = 0;
 renderer.domElement.addEventListener('pointerdown', (event) => {
   dragging = true; lastX = event.clientX; lastY = event.clientY;
@@ -335,6 +358,12 @@ function render() {
     if (animationTime >= 10) playing = false;
   }
   renderer.render(scene, camera);
+  if (bus.visible) {
+    const offset = new THREE.Vector3(2.8, 1.9, 3.5).applyQuaternion(bus.quaternion);
+    vehicleCamera.position.copy(bus.position).add(offset);
+    vehicleCamera.lookAt(bus.position.x, bus.position.y + 0.55, bus.position.z);
+    vehicleRenderer.render(scene, vehicleCamera);
+  }
   positionMapLabels();
 }
 render();

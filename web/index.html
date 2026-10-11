@@ -19,7 +19,7 @@
     <main class="quadrants">
       <section class="quadrant inputs" aria-labelledby="inputs-title">
         <div class="section-head"><span class="section-index">01</span><div><p class="section-eyebrow">DEFINE THE PROBLEM</p><h1 id="inputs-title">Trip inputs</h1></div></div>
-        <p class="section-subtitle">Choose a start, destination and time. Each run searches the same road network under the conditions you set.</p>
+        <p class="section-subtitle">Set the trip and test how the route changes.</p>
         <form id="route-form">
           <div class="field-pair">
             <div class="field"><label for="start">START LOCATION</label><select id="start" required></select></div>
@@ -41,7 +41,7 @@
 
       <section class="quadrant algorithm" aria-labelledby="algorithm-title">
         <div class="section-head"><span class="section-index">02</span><div><p class="section-eyebrow">THE AI CORE</p><h2 id="algorithm-title">Inside A* search</h2></div><button class="source-link" id="view-source" type="button">View source ↗</button></div>
-        <p class="section-subtitle">A* expands the location with the lowest estimated total cost. Select a step to see its actual decision.</p>
+        <p class="section-subtitle">Inspect each node A* chose to expand, in order.</p>
         <div class="formula-row">
           <div class="formula-cell"><span>g(n)</span><strong id="step-g">—</strong><small>time already spent</small></div>
           <div class="formula-sign">+</div>
@@ -60,20 +60,23 @@
       </section>
 
       <section class="quadrant evidence" aria-labelledby="evidence-title">
-        <div class="section-head"><span class="section-index">03</span><div><p class="section-eyebrow">OUTPUT & COMPARISON</p><h2 id="evidence-title">Route evidence</h2></div></div>
-        <div id="error" class="error" hidden></div>
-        <div class="result-top"><div><span class="overline">MINIMUM TRAVEL TIME</span><div class="eta"><span id="eta">—</span><small>minutes</small></div></div><div id="verified" class="verified">Waiting for a run</div></div>
-        <div id="route-path" class="route-path">The selected path will appear here.</div>
+        <div class="evidence-primary">
+          <div class="section-head"><span class="section-index">03</span><div><p class="section-eyebrow">OUTPUT</p><h2 id="evidence-title">Route evidence</h2></div></div>
+          <div id="error" class="error" hidden></div>
+          <div class="result-top"><div><span class="overline">MINIMUM TRAVEL TIME</span><div class="eta"><span id="eta">—</span><small>minutes</small></div></div><div id="verified" class="verified">Waiting for a run</div></div>
+          <div id="route-path" class="route-path">The selected path will appear here.</div>
+        </div>
         <div class="comparison"><div class="mini-head">SAME INPUT, TWO SEARCHES</div><table><thead><tr><th>Algorithm</th><th>Route time</th><th>Expanded</th><th>Runtime*</th></tr></thead><tbody><tr><th>A* + heuristic</th><td id="astar-time">—</td><td id="astar-nodes">—</td><td id="astar-runtime">—</td></tr><tr><th>Dijkstra (h = 0)</th><td id="dijkstra-time">—</td><td id="dijkstra-nodes">—</td><td id="dijkstra-runtime">—</td></tr></tbody></table><p>* Runtime is machine dependent; route cost and expansion count are the primary comparison.</p></div>
-        <div class="leg-head mini-head">HOW THE PATH COST WAS ADDED</div>
-        <div id="legs" class="legs"></div>
-        <details class="reliability"><summary>Optional reliability experiment <span id="reliable-summary">Compare estimated delay risk</span></summary><p>Another decision rule ranks all simple routes by an estimated 90th-percentile arrival time. Its uncertainty values are generated assumptions, not measured traffic.</p><div id="reliable-values"></div><button id="show-reliable" type="button">Show reliability route on map</button></details>
+        <div class="breakdown">
+          <div class="leg-head mini-head">HOW THE PATH COST WAS ADDED</div>
+          <div id="legs" class="legs"></div>
+          <details class="reliability"><summary>Reliability experiment <span id="reliable-summary">Estimated delay risk</span></summary><p>Simple routes are ranked by a modeled 90th-percentile arrival time. Delay values are generated assumptions.</p><div id="reliable-values"></div><button id="show-reliable" type="button">Show reliability route on map</button></details>
+        </div>
       </section>
 
       <section class="quadrant simulation" aria-labelledby="simulation-title">
         <div class="section-head"><span class="section-index">04</span><div><p class="section-eyebrow">VISUAL EVIDENCE</p><h2 id="simulation-title">Shuttle simulation</h2></div><div class="map-actions"><button id="replay" type="button">Replay route ↻</button></div></div>
-        <div class="map-frame"><div id="scene" aria-label="3D schematic map with road network, railway and animated shuttle"></div><div class="map-legend"><span><i class="legend-road"></i>Road</span><span><i class="legend-route"></i>Chosen route</span><span><i class="legend-rail"></i>Railway</span></div></div>
-        <div class="playback"><span id="playback-label">Awaiting a route</span><div class="progress-track"><div id="progress-fill"></div></div><span id="playback-time">0%</span></div>
+        <div class="map-frame"><div id="scene" aria-label="3D schematic map with road network, railway and animated shuttle"></div><div class="vehicle-focus" id="vehicle-focus" hidden><div class="vehicle-focus-head"><strong>SHUTTLE CAM</strong><span>LIVE SIMULATION</span></div><div id="vehicle-scene" aria-label="Close-up of the animated shuttle"></div></div><div class="map-legend"><span><i class="legend-road"></i>Road</span><span><i class="legend-route"></i>Chosen route</span><span><i class="legend-rail"></i>Railway</span></div><div class="playback"><span id="playback-label">Awaiting a route</span><div class="progress-track"><div id="progress-fill"></div></div><span id="playback-time">0%</span></div></div>
       </section>
     </main>
     <dialog id="source-modal"><div class="source-modal-head"><strong>routing.py · AI core</strong><button id="close-source" type="button">Close ×</button></div><pre id="source-code"></pre></dialog>
