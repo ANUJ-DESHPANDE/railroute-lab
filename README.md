@@ -1,83 +1,65 @@
-# VIT Shuttle Lab
+# RailRoute Lab
 
-An interactive, campus-inspired shuttle routing simulator with a Python AI core
-and a local 3D browser view. **Python 3.10+ is enough to run it.** The Three.js
-files required by the browser are bundled under `web/vendor`, so the map does
-not need an internet connection. The optional Google font does.
+A self-implemented, time-aware A* route finder on a reproducible fictional campus. The browser makes the search decisions visible; the AI core runs entirely in Python and can be demonstrated without the browser.
 
-## Run the demo
+## Start the demo
 
-From this folder:
+Python 3.10+ is sufficient for the core and browser app. Three.js is bundled locally for the 3D view.
 
 ```powershell
 python app.py
 ```
 
-Open **http://127.0.0.1:8000**. Select two stops, a departure time, and
-optional tunnel closures. Press **Calculate Route**. Switch between Fastest
-and Reliable to see whether the recommended path changes. Drag the 3D map to
-orbit it, scroll to zoom, and click Replay Shuttle to watch the route.
+Open **http://127.0.0.1:8000**. Choose start, destination, departure time, map seed, and tunnel closures, then select **Run A* search**. The four panels show exact inputs, the A* expansion trace with `g + h = f`, cost and Dijkstra comparison, and a smaller shuttle animation. **View source** displays the actual Python search code.
 
-For a code-first demonstration without the visualizer:
+Code-first review examples:
 
 ```powershell
-python review_demo.py --start "Technology Tower" --goal "Hostel Q Block" --time 12:00
-python review_demo.py --start "Technology Tower" --goal "Hostel Q Block" --time 08:30
-python review_demo.py --start "Technology Tower" --goal "Hostel Q Block" --time 12:00 --close west
+python review_demo.py
+python review_demo.py --time 08:30
+python review_demo.py --close west
+python review_demo.py --start "Design Studio" --goal "Birch Residence" --time 09:59 --seed 42
 python -m unittest -v
 ```
 
-Optional browser interaction check (requires Microsoft Edge and Node.js):
+The default seed (`17`) makes three different decisions easy to show. `Science Hall` to `North Library` at 12:00 uses the west tunnel. At 08:30, the modeled morning congestion favors the east tunnel. Closing west at 12:00 also forces east. Closing both tunnels disconnects a north/south trip, and the app retains the partial A* trace. Try any listed stops, time, and seed from `0` to `99999`; the chosen seed reproduces the same map.
+
+Optional browser interaction check (Microsoft Edge and Node.js required):
 
 ```powershell
 npm install
 npm run check:browser
 ```
 
-Keep `python app.py` running in another terminal for this check.
+Keep `python app.py` running in a second terminal. The check covers the default route, trace controls, source view, reliability view, morning reroute, closures, unreachable goal, and alternate seed.
 
-The first two runs can take different tunnels because the road costs change
-with time. Closing the west tunnel forces another route. The program prints
-the search trace and verifies A* against Dijkstra for each run.
+## AI formulation and implementation
 
-## How the AI core works
+**Problem:** Find the open-road shuttle path with minimum modeled in-vehicle travel time for the specified departure time.
 
-`routing.py` contains our own priority-queue search implementation. The campus
-is a graph: intersections and candidate shuttle stops are nodes; roads are
-edges. For each road, free-flow time is multiplied by a congestion factor.
-The road traversal model integrates progress as the period changes, so entering
-an edge at 09:59 can finish after the 10:00 peak ends.
+| Item | Definition |
+| --- | --- |
+| State | Current road-graph location and its arrival time |
+| Initial state | Chosen start at the requested departure time |
+| Action | Traverse one connected, open road |
+| Transition | Move to its other endpoint and advance time by its time-dependent traversal cost |
+| Goal test | Current location equals the destination |
+| Path cost | Sum of road travel seconds |
 
-A* prioritizes the smallest **f = g + h**, where `g` is elapsed travel time
-and `h` is the straight-line distance to the goal divided by the assumed
-15 km/h maximum shuttle speed. Dijkstra uses the same search with `h = 0`.
-Road lengths and free-flow times are validated so `h` cannot overestimate;
-congestion factors must be at least 1. The browser and CLI show expansion
-order and `g`, `h`, `f` values. Both algorithms must return the same fastest
-ETA under the same scenario.
+`routing.py` implements A* with `heapq`, best-known arrival times, parent links, and a recorded expansion trace. At each step it expands the node with the lowest `f = g + h`: `g` is elapsed travel time and `h` is straight-line distance to the goal divided by an assumed maximum shuttle speed of 15 km/h. The graph validates that road lengths cannot be shorter than straight-line distance, free-flow times cannot imply a higher speed, and congestion factors are at least one. Thus `h` is an optimistic, consistent lower bound under this model. Dijkstra runs the same core with `h = 0` and serves as a cost baseline. A* and Dijkstra need not take the same path when multiple routes tie, but must agree on the optimum modeled cost and reachability.
 
-For the optional Reliable objective, `reliable_route` enumerates simple paths
-in this **small** network and chooses the lowest estimated 90th-percentile ETA.
-It assumes independent, approximately normal road-delay variation around the
-deterministic ETA. The road uncertainty values are hypothetical. The method
-is exact for its declared simple-path model here, but enumeration grows
-exponentially; a larger map would need a different candidate-route search.
+Each road's progress is integrated through any congestion-period boundary it crosses. This avoids an artificial jump in arrival time for a road entered just before 10:00 or 19:00 and retains the FIFO property required by the label-setting search. Morning peak is 07:00–10:00; evening peak is 16:00–19:00. These periods are experiment assumptions.
 
-## Data honesty and limits
+`sample_map.py` generates 14 nodes and 17 bidirectional roads. The railway divides north and south; only two graph edges represent road tunnels across it. The seed changes locations, road lengths, speed, congestion, and delay spread while retaining this topology. `app.py` provides the local API and detailed road-cost breakdown. `review_demo.py` prints the algorithm trace directly in the terminal. `demo.py` is a tiny hand-checkable example.
 
-The VIT Vellore landmark names and the railway split come from the user's
-annotated screenshots and VIT's [campus layout](https://vit.ac.in/files/sustainability-initiatives/Green-Audit-Report.pdf).
-VIT's [campus guide](https://blogs.vit.ac.in/vit-vellore-campus-facilities-a-students-complete-guide/)
-also identifies major academic and hostel landmarks. **Stop choices, exact
-positions, road links, directions, crossing permissions, travel times,
-congestion, and uncertainty are schematic assumptions**, not live or surveyed
-campus data. Edit `vit_demo.py` after field verification.
+The optional reliability experiment in `routing.py` enumerates simple paths on this **small** network and chooses the lowest modeled 90th-percentile ETA. It assumes independent, approximately normal road delays, using generated standard deviations. This is a separate objective, not the A* heuristic or the syllabus algorithm. Enumerating all simple paths does not scale to a large network.
 
-The graph treats the two modeled underpasses as the only railway crossings.
-Roads currently allow travel in both directions; `CampusGraph.add_road` can
-represent one-way roads, but no one-way restriction is claimed without
-verification. The model excludes shuttle schedules, passenger wait time,
-capacity, turns, and live traffic. Its period boundaries are 07:00–10:00 and
-16:00–19:00, chosen for the experiment.
+## Evidence and limits
 
-The basic five-node graph in `demo.py` remains as a minimal algorithm example.
+`test_routing.py` checks 43,120 combinations across five seeds, 11 departure times, all 14-by-14 start/goal pairs, and four tunnel states. It verifies A* and Dijkstra have equal reachability and minimum cost. Additional tests cover boundary crossing, invalid inputs, same start/goal, disconnected graphs, and the default route changes.
+
+This is a **fictional test network**. Locations, stop names, distances, directions, traffic multipliers, and uncertainty are generated or modeled. It is not a VIT map, a surveyed road graph, a real shuttle timetable, or a live ETA service. Passenger waiting time, capacity, turns, and other operational constraints are outside the current cost function. The guide [RailRoute_Project_Understanding_and_Viva.pdf](RailRoute_Project_Understanding_and_Viva.pdf) explains the model and likely viva questions.
+
+To regenerate the guide, install ReportLab and run `python make_understanding_pdf.py`. ReportLab is used only to produce the PDF, never for route decisions.
+
+**AI assistance disclosure:** An AI assistant helped draft/refine synthetic data, code, tests, UI, and study material. The route decisions are performed by the local, inspectable Python implementation, without an external AI API. Include this disclosure in the final course report and verify the code as a team.

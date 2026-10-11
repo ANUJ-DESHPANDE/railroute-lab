@@ -1,8 +1,8 @@
 {
-  "name": "vit-shuttle-lab",
+  "name": "railroute-lab",
   "private": true,
   "version": "0.1.0",
-  "description": "Optional browser QA dependencies for the Python-powered VIT shuttle simulator",
+  "description": "Optional browser QA dependencies for the Python-powered fictional campus route simulator",
   "scripts": {
     "check:browser": "node browser_check.mjs"
   },

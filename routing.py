@@ -1,7 +1,7 @@
-"""A* and Dijkstra for a small, time-aware campus shuttle graph.
+"""Self-implemented A* and Dijkstra for a time-dependent campus road graph.
 
-The departure-time congestion period is held fixed for the whole trip, as
-specified in the team's Review 1 proposal. All costs are in seconds.
+Road traversal integrates congestion across time-period boundaries. Costs are
+seconds, and the straight-line heuristic is a validated lower bound.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from heapq import heappop, heappush
 from itertools import count
-from math import hypot, inf, sqrt
+from math import hypot, inf, isfinite, sqrt
 
 
 MAX_SHUTTLE_SPEED_KMH = 15.0
@@ -62,6 +62,8 @@ class CampusGraph:
     def add_location(self, name: str, east_km: float, north_km: float) -> None:
         if name in self.coordinates:
             raise ValueError(f"Location already exists: {name}")
+        if not all(isfinite(value) for value in (east_km, north_km)):
+            raise ValueError("Location coordinates must be finite")
         self.coordinates[name] = (east_km, north_km)
         self.neighbors[name] = []
 
@@ -77,10 +79,10 @@ class CampusGraph:
     ) -> None:
         if start not in self.coordinates or end not in self.coordinates:
             raise ValueError("Both road endpoints must be known locations")
-        if start == end or distance_km <= 0 or free_flow_seconds <= 0:
+        if start == end or not all(isfinite(value) and value > 0 for value in (distance_km, free_flow_seconds)):
             raise ValueError("A road needs different endpoints and positive distance/time")
         values = dict(multipliers or {period: 1.0 for period in PERIODS})
-        if set(values) != set(PERIODS) or any(value < 1 for value in values.values()):
+        if set(values) != set(PERIODS) or any(not isfinite(value) or value < 1 for value in values.values()):
             raise ValueError("Every period needs a congestion multiplier >= 1")
         straight_km = hypot(
             self.coordinates[start][0] - self.coordinates[end][0],
@@ -91,8 +93,8 @@ class CampusGraph:
         if free_flow_seconds + 1e-9 < distance_km / MAX_SHUTTLE_SPEED_KMH * 3600:
             raise ValueError("Free-flow travel time exceeds the assumed 15 km/h speed")
         uncertainty = 0.15 * free_flow_seconds if uncertainty_seconds is None else uncertainty_seconds
-        if uncertainty < 0:
-            raise ValueError("Uncertainty must be non-negative")
+        if not isfinite(uncertainty) or uncertainty < 0:
+            raise ValueError("Uncertainty must be finite and non-negative")
         self.neighbors[start].append(Edge(end, distance_km, free_flow_seconds, values, uncertainty))
         if bidirectional:
             self.neighbors[end].append(Edge(start, distance_km, free_flow_seconds, values, uncertainty))
@@ -101,6 +103,8 @@ class CampusGraph:
 def congestion_period(departure_time: str) -> str:
     """Classify a 24-hour HH:MM departure time."""
     try:
+        if not isinstance(departure_time, str):
+            raise ValueError
         hour_text, minute_text = departure_time.split(":")
         if len(hour_text) != 2 or len(minute_text) != 2:
             raise ValueError
@@ -173,6 +177,7 @@ def _search(
     departure_time: str,
     use_heuristic: bool,
     closed_roads: set[tuple[str, str]] | None = None,
+    trace: list[SearchExpansion] | None = None,
 ) -> RouteResult | None:
     if start not in graph.coordinates or goal not in graph.coordinates:
         raise ValueError("Start and goal must be known locations")
@@ -186,7 +191,7 @@ def _search(
     best_g = {start: 0.0}
     parent: dict[str, tuple[str, Edge]] = {}
     expanded: set[str] = set()
-    expansion_log: list[SearchExpansion] = []
+    expansion_log: list[SearchExpansion] = trace if trace is not None else []
 
     while frontier:
         _, _, current, queued_g = heappop(frontier)
@@ -226,9 +231,10 @@ def astar(
     goal: str,
     departure_time: str,
     closed_roads: set[tuple[str, str]] | None = None,
+    trace: list[SearchExpansion] | None = None,
 ) -> RouteResult | None:
     """Find a minimum-travel-time route with a straight-line time heuristic."""
-    return _search(graph, start, goal, departure_time, use_heuristic=True, closed_roads=closed_roads)
+    return _search(graph, start, goal, departure_time, use_heuristic=True, closed_roads=closed_roads, trace=trace)
 
 
 def dijkstra(
@@ -237,9 +243,10 @@ def dijkstra(
     goal: str,
     departure_time: str,
     closed_roads: set[tuple[str, str]] | None = None,
+    trace: list[SearchExpansion] | None = None,
 ) -> RouteResult | None:
     """Find the same optimum without a heuristic (A* with h = 0)."""
-    return _search(graph, start, goal, departure_time, use_heuristic=False, closed_roads=closed_roads)
+    return _search(graph, start, goal, departure_time, use_heuristic=False, closed_roads=closed_roads, trace=trace)
 
 
 def reliable_route(
