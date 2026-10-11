@@ -1,6 +1,17 @@
 import * as THREE from './vendor/three.module.js';
 
 const $ = (selector) => document.querySelector(selector);
+// Short, stable display IDs make the search trace and the map easy to match.
+// The Python graph continues to use full location names as its node keys.
+const NODE_ORDER = [
+  'Science Hall', 'West Tunnel South', 'West Tunnel North', 'North Library',
+  'East Lecture Hall', 'East Tunnel South', 'East Tunnel North', 'Birch Residence',
+  'Design Studio', 'West Entrance', 'Innovation Lab', 'Admin Center',
+  'Maple Residence', 'Cedar Residence',
+];
+const NODE_IDS = new Map(NODE_ORDER.map((name, index) => [name, String.fromCharCode(65 + index)]));
+const nodeId = (name) => NODE_IDS.get(name) || '?';
+const nodeLabel = (name) => `${nodeId(name)} · ${name}`;
 let graph = null;
 let routeData = null;
 let seedLoaded = null;
@@ -35,30 +46,60 @@ function setMapLabels() {
   mapLabels.forEach(({element}) => element.remove());
   mapLabels.length = 0;
   if (!graph) return;
-  const stops = [
-    [routeData?.input.start || $('#start').value, 'START'],
-    [routeData?.input.goal || $('#goal').value, 'GOAL'],
-    ['West Tunnel North', 'WEST TUNNEL'],
-    ['East Tunnel North', 'EAST TUNNEL'],
-  ];
-  for (const [name, role] of stops) {
+  for (const {name} of graph.locations) {
     const element = document.createElement('div');
-    element.className = `map-label ${role === 'START' || role === 'GOAL' ? 'map-label-stop' : ''}`;
-    element.innerHTML = `<small>${role}</small><strong></strong>`;
-    element.querySelector('strong').textContent = role === 'START' || role === 'GOAL' ? name : '';
+    element.className = 'map-label map-node-label';
+    const letter = document.createElement('b'); letter.textContent = nodeId(name);
+    const label = document.createElement('span'); label.textContent = name;
+    const role = document.createElement('small');
+    element.append(letter, label, role);
     mapFrame.appendChild(element);
     mapLabels.push({element, name});
+  }
+  refreshMapRoles();
+}
+function refreshMapRoles() {
+  const start = routeData?.input.start || $('#start').value;
+  const goal = routeData?.input.goal || $('#goal').value;
+  const now = viewMode === 'search' ? routeData?.astar_trace?.[currentTrace]?.node : null;
+  for (const {element, name} of mapLabels) {
+    element.classList.toggle('is-start', name === start);
+    element.classList.toggle('is-goal', name === goal);
+    element.classList.toggle('is-current', name === now);
+    element.querySelector('small').textContent = name === now ? 'NOW' : name === start ? 'START' : name === goal ? 'GOAL' : '';
   }
 }
 
 function positionMapLabels() {
   if (!graph) return;
   const width = mapFrame.clientWidth, height = mapFrame.clientHeight;
-  for (const {element, name} of mapLabels) {
-    const p = point(name, 0.35).project(camera);
-    element.style.left = `${(p.x + 1) * width / 2}px`;
-    element.style.top = `${(1 - p.y) * height / 2}px`;
-    element.hidden = p.z > 1 || p.z < -1 || Math.abs(p.x) > 0.96 || Math.abs(p.y) > 0.90;
+  const entries = mapLabels.map(({element, name}) => {
+    const p = point(name, 0.25).project(camera);
+    return {element, name, p, x: (p.x + 1) * width / 2, y: (1 - p.y) * height / 2};
+  }).sort((a, b) =>
+    Number(b.element.classList.contains('is-current')) - Number(a.element.classList.contains('is-current')) ||
+    Number(b.element.classList.contains('is-goal')) - Number(a.element.classList.contains('is-goal')) ||
+    Number(b.element.classList.contains('is-start')) - Number(a.element.classList.contains('is-start')));
+  const placed = [];
+  for (const {element, p, x, y} of entries) {
+    if (p.z > 1 || p.z < -1 || x < 0 || x > width || y < 0 || y > height) {
+      element.hidden = true;
+      continue;
+    }
+    const w = element.offsetWidth || 95, h = element.offsetHeight || 22;
+    const candidates = [
+      [x + 8, y - h - 6], [x - w - 8, y - h - 6],
+      [x + 8, y + 5], [x - w - 8, y + 5],
+      [x - w / 2, y - h - 11], [x - w / 2, y + 9],
+    ];
+    let chosen = candidates.find(([left, top]) =>
+      left >= 4 && left + w <= width - 4 && top >= 39 && top + h <= height - 31 &&
+      placed.every(([px, py, pw, ph]) => left > px + pw + 2 || left + w + 2 < px || top > py + ph + 2 || top + h + 2 < py));
+    if (!chosen) chosen = [Math.max(4, Math.min(width - w - 4, x + 7)), Math.max(39, Math.min(height - h - 31, y - h - 5))];
+    element.style.left = `${chosen[0]}px`;
+    element.style.top = `${chosen[1]}px`;
+    element.hidden = false;
+    placed.push([chosen[0], chosen[1], w, h]);
   }
   for (const {element, position} of edgeLabels) {
     const p = position.clone().project(camera);
@@ -325,7 +366,8 @@ function drawSearchStep(item) {
   routeGroup.visible = false;
   bus.visible = false;
   playing = false;
-  $('#map-stage').textContent = `SEARCH ${currentTrace + 1}/${routeData.astar_trace.length} · Checking roads from ${item.node}`;
+  $('#map-stage').textContent = `SEARCH ${currentTrace + 1}/${routeData.astar_trace.length} · Checking roads from ${nodeLabel(item.node)}`;
+  refreshMapRoles();
   $('#legend-highlight').classList.add('is-search');
   $('#legend-label').textContent = 'Road checked now';
   $('#playback-label').textContent = 'Search explores possible roads';
@@ -342,7 +384,8 @@ function showFinalRoute(autoplay = true) {
   routeGroup.visible = true;
   bus.visible = currentPath.length > 0;
   $('#walkthrough-state').textContent = 'FINAL ROUTE';
-  $('#map-stage').textContent = `${displayedMode === 'reliable' ? 'RELIABILITY ROUTE' : 'FINAL FASTEST ROUTE'} · ${routeData.input.start} → ${routeData.input.goal}`;
+  $('#map-stage').textContent = `${displayedMode === 'reliable' ? 'RELIABILITY ROUTE' : 'FINAL FASTEST ROUTE'} · ${nodeLabel(routeData.input.start)} → ${nodeLabel(routeData.input.goal)}`;
+  refreshMapRoles();
   $('#legend-highlight').classList.remove('is-search');
   $('#legend-label').textContent = 'Chosen route';
   for (const step of currentSteps) addEdgeLabel(step.start, step.end, `${minutes(step.seconds)} min`, 'route', 0.25);
@@ -446,7 +489,7 @@ function populateStops(preserve = true) {
     select.replaceChildren();
     for (const stop of stops) {
       const option = document.createElement('option');
-      option.value = stop.name; option.textContent = stop.name;
+      option.value = stop.name; option.textContent = nodeLabel(stop.name);
       select.appendChild(option);
     }
   }
@@ -474,7 +517,7 @@ function selectTrace(index, fromPlayback = false) {
   const item = entries[currentTrace];
   $('#walkthrough-state').textContent = 'SEARCH IN PROGRESS';
   $('#step-count').textContent = `${currentTrace + 1} OF ${entries.length}`;
-  $('#step-node').textContent = item.node;
+  $('#step-node').textContent = nodeLabel(item.node);
   $('#step-g').textContent = `${minutes(item.g_seconds)} min`;
   $('#step-h').textContent = `${minutes(item.h_seconds)} min`;
   $('#step-f').textContent = `${minutes(item.f_seconds)} min`;
@@ -484,60 +527,95 @@ function selectTrace(index, fromPlayback = false) {
   $('#heuristic-working').textContent = `${straightKm.toFixed(2)} km ÷ ${graph.max_speed_kmh} km/h = ${minutes(item.h_seconds)} min`;
   $('#heuristic-explanation').textContent = item.node === routeData.input.goal
     ? ' The estimate is zero at the destination.'
-    : ' Straight-line time is a safe lower bound; actual roads can only take as long or longer.';
+    : ' Straight-line time is safe: actual roads cannot be shorter or faster.';
   const choices = item.neighbors || [];
   const queued = choices.filter((choice) => choice.outcome === 'queued').length;
   const closed = choices.filter((choice) => choice.outcome === 'closed').length;
+  $('#roads-from').textContent = nodeLabel(item.node).toUpperCase();
+  $('#candidate-explanation').textContent = item.node === routeData.input.goal
+    ? 'The goal was picked from the queue. No further roads need checking.'
+    : `The h above belongs to ${item.node}. Each destination below gets its own h to ${routeData.input.goal}; new g includes this road, and f = g + h.`;
   $('#decision-text').textContent = item.node === routeData.input.goal
     ? `${routeData.input.goal} is the goal. It now has the lowest f, so A* stops and follows saved parent links to recover the route.`
     : !routeData.astar && currentTrace === entries.length - 1
       ? `A* chose ${item.node}; after checking its roads, nothing remained in the queue. The goal cannot be reached.`
       : currentTrace === 0
-        ? `Start here. A* checks every road leaving ${item.node}, then gives each useful next location a g + h priority.`
+        ? `Start at ${item.node}. Check its ${choices.length} outgoing roads and place useful destinations in the waiting queue.`
         : `Among the waiting locations, ${item.node} had the lowest f (${minutes(item.f_seconds)} min). A* checks its outgoing roads now.`;
   $('#neighbor-summary').textContent = item.node === routeData.input.goal
-    ? 'Goal reached; search stops'
-    : `${queued} added to queue${closed ? ` · ${closed} closed` : ''}`;
+    ? 'Search complete'
+    : `${choices.length} connected road${choices.length === 1 ? '' : 's'}`;
   $('#neighbor-list').replaceChildren();
   if (!choices.length) {
-    const empty = document.createElement('p');
-    empty.className = 'neighbor-empty';
+    const empty = document.createElement('div');
+    empty.className = 'neighbor-empty candidate-empty';
     empty.textContent = item.node === routeData.input.goal ? 'No more roads need checking.' : 'No outgoing roads.';
     $('#neighbor-list').appendChild(empty);
   }
-  for (const choice of choices) {
-    const row = document.createElement('div'); row.className = `neighbor-row outcome-${choice.outcome}`;
-    const name = document.createElement('strong'); name.textContent = `${item.node} → ${choice.destination}`;
-    const edge = document.createElement('span'); edge.className = 'road-time';
-    edge.textContent = choice.road_seconds == null ? 'blocked' : `road +${minutes(choice.road_seconds)} min`;
+  const orderedChoices = [...choices].sort((a, b) =>
+    (a.candidate_f_seconds ?? Infinity) - (b.candidate_f_seconds ?? Infinity));
+  for (const choice of orderedChoices) {
+    const row = document.createElement('div'); row.className = `neighbor-row candidate-card outcome-${choice.outcome}`;
+    const head = document.createElement('div'); head.className = 'candidate-head';
+    const name = document.createElement('strong'); name.textContent = `→ ${nodeLabel(choice.destination)}`;
     const outcome = document.createElement('b');
-    outcome.textContent = ({queued: 'Added', closed: 'Closed', settled: 'Settled', not_better: 'No gain'})[choice.outcome] || choice.outcome;
-    const reason = document.createElement('small');
+    outcome.textContent = ({queued: 'Add to queue', closed: 'Closed', settled: 'Already checked', not_better: 'No improvement'})[choice.outcome] || choice.outcome;
+    head.append(name, outcome);
+    const edge = document.createElement('p'); edge.className = 'candidate-road';
+    edge.textContent = choice.road_seconds == null
+      ? 'This road is closed.'
+      : `Road travel time: +${minutes(choice.road_seconds)} min`;
+    row.append(head, edge);
+    if (choice.candidate_f_seconds != null) {
+      const math = document.createElement('div'); math.className = 'candidate-math';
+      const destination = graph.locations.find((location) => location.name === choice.destination);
+      const km = Math.hypot(destination.east_km - goal.east_km, destination.north_km - goal.north_km);
+      const metrics = [
+        ['g so far', minutes(choice.candidate_g_seconds), `${minutes(item.g_seconds)} + ${minutes(choice.road_seconds)}`],
+        ['h to goal', minutes(choice.candidate_h_seconds), `${km.toFixed(2)} km ÷ 15 km/h`],
+        ['f priority', minutes(choice.candidate_f_seconds), `${minutes(choice.candidate_g_seconds)} + ${minutes(choice.candidate_h_seconds)}`],
+      ];
+      for (const [label, value, calculation] of metrics) {
+        const metric = document.createElement('div'); metric.className = `candidate-metric ${label === 'f priority' ? 'candidate-total' : ''}`;
+        const title = document.createElement('span'); title.textContent = label;
+        const number = document.createElement('strong'); number.textContent = `${value} min`;
+        const work = document.createElement('small'); work.textContent = calculation;
+        metric.append(title, number, work);
+        math.appendChild(metric);
+      }
+      row.appendChild(math);
+    }
+    const reason = document.createElement('p'); reason.className = 'candidate-reason';
     reason.textContent = choice.outcome === 'queued'
-      ? `New best arrival: g ${minutes(choice.candidate_g_seconds)} + h ${minutes(choice.candidate_h_seconds)} = f ${minutes(choice.candidate_f_seconds)} min. Added to queue.`
-      : choice.outcome === 'closed' ? 'This tunnel is closed, so A* cannot use this road.'
-        : choice.outcome === 'settled' ? 'This location was already fully explored.'
-          : 'This road does not improve the saved arrival time.';
-    row.append(name, edge, outcome, reason);
+      ? 'Better arrival → added to queue.'
+      : choice.outcome === 'closed' ? 'No scores are calculated for a blocked road.'
+        : choice.outcome === 'settled' ? 'Already fully explored.'
+          : 'A faster arrival is already known.';
+    row.appendChild(reason);
     $('#neighbor-list').appendChild(row);
   }
   const pending = item.frontier_after || [];
   $('#frontier-list').replaceChildren();
-  $('#frontier-next').textContent = pending.length ? `${pending.length} waiting · lowest f goes next` : 'Queue empty';
+  $('#frontier-list').title = '';
+  $('#frontier-next').textContent = pending.length ? `${pending.length} waiting` : 'Queue empty';
+  $('#next-reason').textContent = item.node === routeData.input.goal
+    ? `The goal was selected. A* is done; its saved parent links give the ${minutes(routeData.astar.travel_seconds)} minute route.`
+    : pending.length
+      ? `Next: ${nodeLabel(pending[0].node)}. Its f = ${minutes(pending[0].f_seconds)} min is the smallest among all ${pending.length} waiting location${pending.length === 1 ? '' : 's'}.`
+      : 'Nothing is left waiting, so A* cannot reach the destination from this start.';
   if (!pending.length) {
-    const empty = document.createElement('p'); empty.className = 'frontier-empty';
-    empty.textContent = item.node === routeData.input.goal ? 'Goal reached. Search complete.' : 'No other location is waiting.';
-    $('#frontier-list').appendChild(empty);
+    $('#frontier-list').textContent = item.node === routeData.input.goal
+      ? 'The chosen path appears in Route evidence.'
+      : 'The search has exhausted the reachable part of the map.';
+  } else {
+    const other = pending.slice(1);
+    const displayed = other.slice(0, 3).map((candidate) => `${nodeLabel(candidate.node)} (f ${minutes(candidate.f_seconds)})`);
+    $('#frontier-list').textContent = other.length
+      ? `Still waiting: ${displayed.join(', ')}${other.length > 3 ? `, and ${other.length - 3} more` : ''}.`
+      : 'No other locations are waiting.';
+    $('#frontier-list').title = other.map((candidate) =>
+      `${candidate.node}: g ${minutes(candidate.g_seconds)} + h ${minutes(candidate.h_seconds)} = f ${minutes(candidate.f_seconds)}`).join('\n');
   }
-  pending.forEach((candidate, rank) => {
-    const row = document.createElement('div'); row.className = `frontier-row ${rank === 0 ? 'next' : ''}`;
-    const order = document.createElement('b'); order.textContent = rank === 0 ? 'NEXT →' : `#${rank + 1}`;
-    const name = document.createElement('span'); name.textContent = candidate.node;
-    const arithmetic = document.createElement('small'); arithmetic.textContent = `g ${minutes(candidate.g_seconds)} + h ${minutes(candidate.h_seconds)}`;
-    const score = document.createElement('strong'); score.textContent = `f ${minutes(candidate.f_seconds)} min`;
-    row.append(order, name, arithmetic, score);
-    $('#frontier-list').appendChild(row);
-  });
   document.querySelectorAll('#trace-list button').forEach((button, i) => button.classList.toggle('active', i === currentTrace));
   $('#previous-step').disabled = currentTrace === 0;
   $('#next-step').disabled = currentTrace === entries.length - 1 && !routeData.astar;
@@ -546,6 +624,7 @@ function selectTrace(index, fromPlayback = false) {
 }
 function updateAlgorithm() {
   const entries = routeData?.astar_trace || [];
+  $('.jump-steps').open = false;
   $('#trace-list').replaceChildren();
   if (!entries.length) {
     $('#step-count').textContent = '—';
@@ -556,6 +635,9 @@ function updateAlgorithm() {
     $('#neighbor-list').replaceChildren();
     $('#frontier-list').replaceChildren();
     $('#frontier-next').textContent = 'No queue';
+    $('#next-reason').textContent = 'Run a search to see which location A* will choose next.';
+    $('#roads-from').textContent = 'THIS LOCATION';
+    $('#candidate-explanation').textContent = 'Each destination gets its own g, h and f values.';
     $('#heuristic-working').textContent = 'straight-line distance ÷ 15 km/h';
     focusRing.visible = false;
     clearSearchHighlights();
@@ -564,7 +646,7 @@ function updateAlgorithm() {
   entries.forEach((entry, index) => {
     const button = document.createElement('button');
     const number = document.createElement('b'); number.textContent = `${index + 1}`;
-    const name = document.createElement('small'); name.textContent = entry.node;
+    const name = document.createElement('small'); name.textContent = nodeLabel(entry.node);
     button.append(number, name);
     button.title = `${entry.node}: g ${minutes(entry.g_seconds)} + h ${minutes(entry.h_seconds)} = f ${minutes(entry.f_seconds)} min`;
     button.addEventListener('click', () => selectTrace(index));
@@ -616,7 +698,7 @@ function updateResults() {
       const arrow = document.createElement('span'); arrow.className = 'route-arrow'; arrow.textContent = '→';
       $('#route-path').appendChild(arrow);
     }
-    const stop = document.createElement('span'); stop.className = 'route-stop'; stop.textContent = name;
+    const stop = document.createElement('span'); stop.className = 'route-stop'; stop.textContent = nodeLabel(name);
     $('#route-path').appendChild(stop);
   });
   const tunnel = a.path.includes('West Tunnel South') ? 'west tunnel' : a.path.includes('East Tunnel South') ? 'east tunnel' : null;

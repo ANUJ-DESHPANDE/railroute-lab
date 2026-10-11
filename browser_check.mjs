@@ -36,9 +36,16 @@ try {
   await page.screenshot({path: 'demo-screenshot.png', fullPage: true});
   assert.equal(await page.locator('.masthead').count(), 0);
   assert.equal(await page.locator('#vehicle-focus').count(), 0);
-  assert.ok(await page.locator('#neighbor-list .neighbor-row').count() > 0);
-  assert.match(await page.locator('#neighbor-list').innerText(), /Added/);
-  assert.match(await page.locator('#frontier-list .next').innerText(), /West Tunnel South/);
+  assert.equal(await page.locator('#neighbor-list .candidate-card').count(), 3);
+  assert.equal(await page.locator('.map-node-label').count(), 14);
+  assert.deepEqual((await page.locator('.map-node-label b').allInnerTexts()).sort(), 'ABCDEFGHIJKLMN'.split(''));
+  assert.equal(await page.locator('.map-node-label[hidden]').count(), 0);
+  assert.match(await page.locator('#start').locator('option:checked').innerText(), /^A · Science Hall$/);
+  assert.match(await page.locator('#goal').locator('option:checked').innerText(), /^D · North Library$/);
+  assert.match(await page.locator('#neighbor-list .candidate-card').first().innerText(), /West Tunnel South/);
+  assert.match(await page.locator('#neighbor-list .candidate-card').first().innerText(), /h to goal\s+3\.6 min/);
+  assert.match(await page.locator('#next-reason').innerText(), /West Tunnel South.*f = 4\.6 min/);
+  assert.match(await page.locator('#frontier-list').innerText(), /East Lecture Hall.*Design Studio/);
   assert.match(await page.locator('#heuristic-working').innerText(), /km ÷ 15 km\/h/);
   assert.match(await page.locator('#map-stage').innerText(), /SEARCH 1\/11.*Science Hall/);
   assert.equal(await page.locator('.edge-cost').count(), await page.locator('#neighbor-list .neighbor-row').count());
@@ -72,12 +79,13 @@ try {
   assert.equal(await page.locator('#legend-label').innerText(), 'Chosen route');
   await page.getByRole('button', {name: /Previous expansion/}).click();
   assert.match(await page.locator('#map-stage').innerText(), /SEARCH 11\/11/);
+  await page.locator('.jump-steps summary').click();
   await page.locator('#trace-list button').first().click();
 
   await page.getByRole('button', {name: /Next expansion/}).click();
   assert.match(await page.locator('#step-count').innerText(), /2 OF/);
-  assert.match(await page.locator('#neighbor-summary').innerText(), /added to queue/);
-  assert.match(await page.locator('#frontier-list .next').innerText(), /East Lecture Hall/);
+  assert.match(await page.locator('#neighbor-summary').innerText(), /connected roads/);
+  assert.match(await page.locator('#next-reason').innerText(), /East Lecture Hall/);
   await page.locator('#trace-list button').nth(9).click();
   await page.locator('#play-search').click();
   await page.waitForFunction(() => document.querySelector('#map-stage')?.textContent?.includes('FINAL FASTEST ROUTE'), {timeout: 5000});
@@ -105,6 +113,7 @@ try {
   assert.equal(await page.locator('#verified').innerText(), 'No reachable route');
   assert.ok(Number(await page.locator('#astar-nodes').innerText()) > 1);
   assert.match(await page.locator('#step-count').innerText(), /OF/);
+  await page.locator('.jump-steps summary').click();
   await page.locator('#trace-list button').filter({hasText: 'West Tunnel South'}).click();
   assert.match(await page.locator('#neighbor-list').innerText(), /Closed/);
   await page.locator('#trace-list button').last().click();
