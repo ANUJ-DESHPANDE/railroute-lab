@@ -13,6 +13,10 @@ let playing = false;
 let roadGroup = null;
 let routeGroup = null;
 let landmarkGroup = null;
+let searchGroup = null;
+let edgeLabels = [];
+let viewMode = 'search';
+let walkthroughTimer = null;
 
 const sceneHost = $('#scene');
 const scene = new THREE.Scene();
@@ -32,8 +36,8 @@ function setMapLabels() {
   mapLabels.length = 0;
   if (!graph) return;
   const stops = [
-    [$('#start').value, 'START'],
-    [$('#goal').value, 'GOAL'],
+    [routeData?.input.start || $('#start').value, 'START'],
+    [routeData?.input.goal || $('#goal').value, 'GOAL'],
     ['West Tunnel North', 'WEST TUNNEL'],
     ['East Tunnel North', 'EAST TUNNEL'],
   ];
@@ -55,6 +59,12 @@ function positionMapLabels() {
     element.style.left = `${(p.x + 1) * width / 2}px`;
     element.style.top = `${(1 - p.y) * height / 2}px`;
     element.hidden = p.z > 1 || p.z < -1 || Math.abs(p.x) > 0.96 || Math.abs(p.y) > 0.90;
+  }
+  for (const {element, position} of edgeLabels) {
+    const p = position.clone().project(camera);
+    element.style.left = `${(p.x + 1) * width / 2}px`;
+    element.style.top = `${(1 - p.y) * height / 2}px`;
+    element.hidden = p.z > 1 || p.z < -1 || Math.abs(p.x) > 0.94 || Math.abs(p.y) > 0.83;
   }
 }
 
@@ -200,7 +210,7 @@ function isTunnel(start, end) {
 }
 function isClosed(start, end) {
   return Object.entries(graph.tunnels).some(([name, [a, b]]) =>
-    $('#close-' + name).checked && ((start === a && end === b) || (start === b && end === a)));
+    (routeData?.input.closed.includes(name) ?? $('#close-' + name).checked) && ((start === a && end === b) || (start === b && end === a)));
 }
 function roadCurve(start, end, height = 0.09) {
   const a = point(start, height), b = point(end, height);
@@ -277,6 +287,81 @@ function drawRoute(path) {
   animationTime = 0;
   playing = path.length > 1;
   placeBus(0);
+}
+function clearEdgeLabels() {
+  edgeLabels.forEach(({element}) => element.remove());
+  edgeLabels = [];
+}
+function addEdgeLabel(start, end, label, kind, height = 0.22) {
+  const element = document.createElement('div');
+  element.className = `edge-cost edge-cost-${kind}`;
+  element.textContent = label;
+  mapFrame.appendChild(element);
+  edgeLabels.push({element, position: roadCurve(start, end, height).getPoint(0.54)});
+}
+function clearSearchHighlights() {
+  if (searchGroup) scene.remove(searchGroup);
+  searchGroup = null;
+  clearEdgeLabels();
+}
+function drawSearchStep(item) {
+  clearSearchHighlights();
+  searchGroup = new THREE.Group();
+  for (const choice of item.neighbors || []) {
+    const kind = choice.outcome;
+    const color = kind === 'queued' ? 0x167f7c : kind === 'closed' ? 0xb8684f : 0x98a5a2;
+    const curve = roadCurve(item.node, choice.destination, 0.19);
+    searchGroup.add(makeTube(curve, kind === 'queued' ? 0.11 : 0.07, color, kind === 'queued' ? 1 : 0.8));
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.14, 14, 10), new THREE.MeshBasicMaterial({color}));
+    dot.position.copy(point(choice.destination, 0.23));
+    searchGroup.add(dot);
+    const label = kind === 'closed' ? 'CLOSED' : choice.road_seconds == null ? kind : `+${minutes(choice.road_seconds)} min`;
+    addEdgeLabel(item.node, choice.destination, label, kind);
+  }
+  scene.add(searchGroup);
+  focusRing.position.copy(point(item.node, 0.15));
+  focusRing.scale.setScalar(1.45);
+  focusRing.visible = true;
+  routeGroup.visible = false;
+  bus.visible = false;
+  playing = false;
+  $('#map-stage').textContent = `SEARCH ${currentTrace + 1}/${routeData.astar_trace.length} · Checking roads from ${item.node}`;
+  $('#legend-highlight').classList.add('is-search');
+  $('#legend-label').textContent = 'Road checked now';
+  $('#playback-label').textContent = 'Search explores possible roads';
+  $('#progress-fill').style.width = `${Math.round((currentTrace + 1) / routeData.astar_trace.length * 100)}%`;
+  $('#playback-time').textContent = `${currentTrace + 1}/${routeData.astar_trace.length}`;
+}
+function showFinalRoute(autoplay = true) {
+  if (!routeData?.astar) return;
+  if (currentTrace !== routeData.astar_trace.length - 1) selectTrace(routeData.astar_trace.length - 1, true);
+  stopWalkthrough();
+  viewMode = 'route';
+  clearSearchHighlights();
+  focusRing.visible = false;
+  routeGroup.visible = true;
+  bus.visible = currentPath.length > 0;
+  $('#walkthrough-state').textContent = 'FINAL ROUTE';
+  $('#map-stage').textContent = `${displayedMode === 'reliable' ? 'RELIABILITY ROUTE' : 'FINAL FASTEST ROUTE'} · ${routeData.input.start} → ${routeData.input.goal}`;
+  $('#legend-highlight').classList.remove('is-search');
+  $('#legend-label').textContent = 'Chosen route';
+  for (const step of currentSteps) addEdgeLabel(step.start, step.end, `${minutes(step.seconds)} min`, 'route', 0.25);
+  if (autoplay) {
+    animationTime = 0;
+    playing = currentPath.length > 1;
+    placeBus(0);
+  } else {
+    playing = false;
+    placeBus(1);
+  }
+  $('#previous-step').disabled = false;
+  $('#next-step').disabled = true;
+  $('#next-step').textContent = 'Route shown';
+}
+function stopWalkthrough() {
+  if (walkthroughTimer) clearInterval(walkthroughTimer);
+  walkthroughTimer = null;
+  $('#play-search').textContent = 'Play search → shuttle';
 }
 function placeBus(progress) {
   if (!currentPath.length) return;
@@ -380,11 +465,14 @@ async function loadMap(seed, preserve = true) {
   setMapLabels();
   resize();
 }
-function selectTrace(index) {
+function selectTrace(index, fromPlayback = false) {
   const entries = routeData?.astar_trace || [];
   if (!entries.length) return;
+  if (!fromPlayback) stopWalkthrough();
+  viewMode = 'search';
   currentTrace = Math.max(0, Math.min(entries.length - 1, index));
   const item = entries[currentTrace];
+  $('#walkthrough-state').textContent = 'SEARCH IN PROGRESS';
   $('#step-count').textContent = `${currentTrace + 1} OF ${entries.length}`;
   $('#step-node').textContent = item.node;
   $('#step-g').textContent = `${minutes(item.g_seconds)} min`;
@@ -394,17 +482,22 @@ function selectTrace(index) {
   const goal = graph.locations.find((location) => location.name === routeData.input.goal);
   const straightKm = Math.hypot(here.east_km - goal.east_km, here.north_km - goal.north_km);
   $('#heuristic-working').textContent = `${straightKm.toFixed(2)} km ÷ ${graph.max_speed_kmh} km/h = ${minutes(item.h_seconds)} min`;
+  $('#heuristic-explanation').textContent = item.node === routeData.input.goal
+    ? ' The estimate is zero at the destination.'
+    : ' Straight-line time is a safe lower bound; actual roads can only take as long or longer.';
   const choices = item.neighbors || [];
   const queued = choices.filter((choice) => choice.outcome === 'queued').length;
   const closed = choices.filter((choice) => choice.outcome === 'closed').length;
   $('#decision-text').textContent = item.node === routeData.input.goal
-    ? 'The goal was removed from the queue. Follow saved parent links backward to reconstruct the minimum-cost path.'
+    ? `${routeData.input.goal} is the goal. It now has the lowest f, so A* stops and follows saved parent links to recover the route.`
     : !routeData.astar && currentTrace === entries.length - 1
-      ? 'After checking these roads, the queue emptied before the goal was reached. No connected route exists.'
-      : `A* removed ${item.node}, the lowest-f waiting location. ${queued} road${queued === 1 ? '' : 's'} gave a better arrival${closed ? `; ${closed} closed road${closed === 1 ? ' was' : 's were'} ignored` : ''}.`;
+      ? `A* chose ${item.node}; after checking its roads, nothing remained in the queue. The goal cannot be reached.`
+      : currentTrace === 0
+        ? `Start here. A* checks every road leaving ${item.node}, then gives each useful next location a g + h priority.`
+        : `Among the waiting locations, ${item.node} had the lowest f (${minutes(item.f_seconds)} min). A* checks its outgoing roads now.`;
   $('#neighbor-summary').textContent = item.node === routeData.input.goal
     ? 'Goal reached; search stops'
-    : `${queued} added to queue · ${choices.length - queued} skipped`;
+    : `${queued} added to queue${closed ? ` · ${closed} closed` : ''}`;
   $('#neighbor-list').replaceChildren();
   if (!choices.length) {
     const empty = document.createElement('p');
@@ -414,19 +507,23 @@ function selectTrace(index) {
   }
   for (const choice of choices) {
     const row = document.createElement('div'); row.className = `neighbor-row outcome-${choice.outcome}`;
-    const name = document.createElement('strong'); name.textContent = choice.destination;
-    const edge = document.createElement('span'); edge.textContent = choice.road_seconds == null ? '—' : `${minutes(choice.road_seconds)} min`;
-    const score = document.createElement('span');
-    score.textContent = choice.candidate_f_seconds == null ? '—' : `${minutes(choice.candidate_f_seconds)} min`;
-    if (choice.candidate_f_seconds != null) score.title = `g ${minutes(choice.candidate_g_seconds)} + h ${minutes(choice.candidate_h_seconds)}`;
+    const name = document.createElement('strong'); name.textContent = `${item.node} → ${choice.destination}`;
+    const edge = document.createElement('span'); edge.className = 'road-time';
+    edge.textContent = choice.road_seconds == null ? 'blocked' : `road +${minutes(choice.road_seconds)} min`;
     const outcome = document.createElement('b');
     outcome.textContent = ({queued: 'Added', closed: 'Closed', settled: 'Settled', not_better: 'No gain'})[choice.outcome] || choice.outcome;
-    row.append(name, edge, score, outcome);
+    const reason = document.createElement('small');
+    reason.textContent = choice.outcome === 'queued'
+      ? `New best arrival: g ${minutes(choice.candidate_g_seconds)} + h ${minutes(choice.candidate_h_seconds)} = f ${minutes(choice.candidate_f_seconds)} min. Added to queue.`
+      : choice.outcome === 'closed' ? 'This tunnel is closed, so A* cannot use this road.'
+        : choice.outcome === 'settled' ? 'This location was already fully explored.'
+          : 'This road does not improve the saved arrival time.';
+    row.append(name, edge, outcome, reason);
     $('#neighbor-list').appendChild(row);
   }
   const pending = item.frontier_after || [];
   $('#frontier-list').replaceChildren();
-  $('#frontier-next').textContent = pending.length ? `${pending.length} waiting · lowest f next` : 'Queue empty';
+  $('#frontier-next').textContent = pending.length ? `${pending.length} waiting · lowest f goes next` : 'Queue empty';
   if (!pending.length) {
     const empty = document.createElement('p'); empty.className = 'frontier-empty';
     empty.textContent = item.node === routeData.input.goal ? 'Goal reached. Search complete.' : 'No other location is waiting.';
@@ -434,16 +531,18 @@ function selectTrace(index) {
   }
   pending.forEach((candidate, rank) => {
     const row = document.createElement('div'); row.className = `frontier-row ${rank === 0 ? 'next' : ''}`;
-    const order = document.createElement('b'); order.textContent = rank === 0 ? 'NEXT' : `#${rank + 1}`;
+    const order = document.createElement('b'); order.textContent = rank === 0 ? 'NEXT →' : `#${rank + 1}`;
     const name = document.createElement('span'); name.textContent = candidate.node;
-    const arithmetic = document.createElement('small'); arithmetic.textContent = `${minutes(candidate.g_seconds)} + ${minutes(candidate.h_seconds)}`;
-    const score = document.createElement('strong'); score.textContent = `${minutes(candidate.f_seconds)} min`;
+    const arithmetic = document.createElement('small'); arithmetic.textContent = `g ${minutes(candidate.g_seconds)} + h ${minutes(candidate.h_seconds)}`;
+    const score = document.createElement('strong'); score.textContent = `f ${minutes(candidate.f_seconds)} min`;
     row.append(order, name, arithmetic, score);
     $('#frontier-list').appendChild(row);
   });
   document.querySelectorAll('#trace-list button').forEach((button, i) => button.classList.toggle('active', i === currentTrace));
-  focusRing.position.copy(point(item.node, 0.15));
-  focusRing.visible = true;
+  $('#previous-step').disabled = currentTrace === 0;
+  $('#next-step').disabled = currentTrace === entries.length - 1 && !routeData.astar;
+  $('#next-step').textContent = currentTrace === entries.length - 1 ? 'Show route →' : 'Next →';
+  drawSearchStep(item);
 }
 function updateAlgorithm() {
   const entries = routeData?.astar_trace || [];
@@ -459,36 +558,39 @@ function updateAlgorithm() {
     $('#frontier-next').textContent = 'No queue';
     $('#heuristic-working').textContent = 'straight-line distance ÷ 15 km/h';
     focusRing.visible = false;
+    clearSearchHighlights();
     return;
   }
   entries.forEach((entry, index) => {
     const button = document.createElement('button');
-    const number = document.createElement('b'); number.textContent = `#${index + 1}`;
+    const number = document.createElement('b'); number.textContent = `${index + 1}`;
     const name = document.createElement('small'); name.textContent = entry.node;
-    const score = document.createElement('span'); score.textContent = `f ${minutes(entry.f_seconds)}`;
-    button.append(number, name, score);
+    button.append(number, name);
     button.title = `${entry.node}: g ${minutes(entry.g_seconds)} + h ${minutes(entry.h_seconds)} = f ${minutes(entry.f_seconds)} min`;
     button.addEventListener('click', () => selectTrace(index));
     $('#trace-list').appendChild(button);
   });
   selectTrace(0);
 }
-function showPath(mode) {
+function showPath(mode, autoFinal = true) {
   if (!routeData) return;
   displayedMode = mode;
   const result = mode === 'reliable' ? routeData.reliable : routeData.astar;
   currentSteps = mode === 'reliable' ? routeData.reliable_steps : routeData.steps;
   drawRoute(result?.path || []);
+  if (autoFinal && result?.path?.length) showFinalRoute(true);
   $('#show-reliable').textContent = mode === 'reliable' ? 'Return to fastest route on map' : 'Show reliability route on map';
 }
 function updateResults() {
   const a = routeData.astar, d = routeData.dijkstra, r = routeData.reliable;
   if (!a) {
+    $('#show-final').disabled = true;
+    $('#replay').disabled = true;
     showError('No route exists with these tunnel closures. Reopen a crossing or choose stops on the same side of the railway.');
     $('#eta').textContent = '—';
     $('#verified').textContent = 'No reachable route';
     $('#verified').classList.add('failed');
-    $('#route-path').textContent = 'The graph has no open connection between these locations.';
+    $('#route-path').textContent = 'No connected route under these conditions.';
     $('#route-reason').textContent = 'A* exhausted every reachable road without reaching the destination.';
     for (const id of ['#astar-time', '#dijkstra-time']) $(id).textContent = '—';
     $('#astar-nodes').textContent = routeData.astar_trace.length;
@@ -496,17 +598,27 @@ function updateResults() {
     $('#comparison-insight').textContent = 'Both methods explored the reachable part of the network and found no path.';
     $('#legs').replaceChildren();
     $('#reliable-values').textContent = 'No candidate route is available.';
-    showPath('fastest');
+    showPath('fastest', false);
     $('#playback-label').textContent = 'No shuttle route';
     $('#progress-fill').style.width = '0%';
     $('#playback-time').textContent = '0%';
     return;
   }
+  $('#show-final').disabled = false;
+  $('#replay').disabled = false;
   showError('');
   $('#eta').textContent = minutes(a.travel_seconds);
   $('#verified').textContent = routeData.verified_optimum ? '✓ A* and Dijkstra agree on the optimum' : 'Search mismatch: inspect the core';
   $('#verified').classList.toggle('failed', !routeData.verified_optimum);
-  $('#route-path').textContent = a.path.join('  →  ');
+  $('#route-path').replaceChildren();
+  a.path.forEach((name, index) => {
+    if (index) {
+      const arrow = document.createElement('span'); arrow.className = 'route-arrow'; arrow.textContent = '→';
+      $('#route-path').appendChild(arrow);
+    }
+    const stop = document.createElement('span'); stop.className = 'route-stop'; stop.textContent = name;
+    $('#route-path').appendChild(stop);
+  });
   const tunnel = a.path.includes('West Tunnel South') ? 'west tunnel' : a.path.includes('East Tunnel South') ? 'east tunnel' : null;
   $('#route-reason').textContent = tunnel
     ? `Uses the ${tunnel}. Its ${routeData.steps.length} road times add to ${minutes(a.travel_seconds)} minutes.`
@@ -533,7 +645,7 @@ function updateResults() {
   $('#reliable-values').textContent = r
     ? `Fastest path: ${minutes(routeData.fastest_p90_seconds)} min estimated P90. Reliability path: ${minutes(r.expected_seconds)} min usual time, ${minutes(r.estimated_p90_seconds)} min estimated P90. ${r.paths_evaluated} simple paths evaluated.`
     : 'No candidate route is available.';
-  showPath('fastest');
+  showPath('fastest', false);
 }
 async function calculate() {
   const seed = Number($('#seed').value);
@@ -557,17 +669,34 @@ async function calculate() {
     routeData = data;
     buildRoads();
     setMapLabels();
-    updateAlgorithm();
     updateResults();
+    updateAlgorithm();
   } catch (error) { showError(error.message); }
 }
 
 $('#route-form').addEventListener('submit', (event) => { event.preventDefault(); calculate(); });
 $('#randomize').addEventListener('click', () => { $('#seed').value = String(Math.floor(Math.random() * 100000)); calculate(); });
-$('#previous-step').addEventListener('click', () => selectTrace(currentTrace - 1));
-$('#next-step').addEventListener('click', () => selectTrace(currentTrace + 1));
+$('#previous-step').addEventListener('click', () => selectTrace(viewMode === 'route' ? routeData.astar_trace.length - 1 : currentTrace - 1));
+$('#next-step').addEventListener('click', () => {
+  if (currentTrace === routeData.astar_trace.length - 1) showFinalRoute(true);
+  else selectTrace(currentTrace + 1);
+});
+$('#show-final').addEventListener('click', () => showFinalRoute(true));
+$('#play-search').addEventListener('click', () => {
+  if (walkthroughTimer) { stopWalkthrough(); return; }
+  if (!routeData?.astar_trace?.length) return;
+  if (viewMode === 'route') selectTrace(0);
+  $('#play-search').textContent = 'Pause walkthrough';
+  walkthroughTimer = setInterval(() => {
+    if (currentTrace < routeData.astar_trace.length - 1) selectTrace(currentTrace + 1, true);
+    else {
+      stopWalkthrough();
+      if (routeData.astar) showFinalRoute(true);
+    }
+  }, 950);
+});
 $('#show-reliable').addEventListener('click', () => showPath(displayedMode === 'reliable' ? 'fastest' : 'reliable'));
-$('#replay').addEventListener('click', () => { animationTime = 0; playing = currentPath.length > 1; placeBus(0); });
+$('#replay').addEventListener('click', () => showFinalRoute(true));
 $('#view-source').addEventListener('click', async () => {
   try {
     const response = await fetch('/api/source');

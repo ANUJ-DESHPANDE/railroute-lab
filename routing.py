@@ -232,10 +232,13 @@ def _search(
     while frontier:
         _, _, current, queued_g = heappop(frontier)
         if queued_g > best_g[current] + 1e-9 or current in expanded:
-            continue  # A better entry superseded this heap entry.
+            continue  # The heap can contain an older, worse route to this node.
+        # FIFO road costs and the consistent heuristic make this arrival final.
         expanded.add(current)
         current_h = _heuristic_seconds(graph, current, goal) if use_heuristic else 0.0
         if current == goal:
+            # Stop only when the goal is popped as the lowest-f candidate;
+            # finding it as a neighbor would not yet prove it is the optimum.
             expansion_log.append(SearchExpansion(current, best_g[current], current_h, best_g[current] + current_h))
             path = [goal]
             distance = 0.0
@@ -252,6 +255,9 @@ def _search(
             if tuple(sorted((current, neighbor))) in closures:
                 decisions.append(NeighborDecision(neighbor, None, None, None, None, "closed"))
                 continue
+            # The road is charged at the time this route reaches it, not at the
+            # trip's original departure time. The cost function handles any
+            # congestion boundary crossed while driving on the road.
             edge_seconds = edge_travel_seconds(edge, departure_clock + best_g[current])
             new_g = best_g[current] + edge_seconds
             h = _heuristic_seconds(graph, neighbor, goal) if use_heuristic else 0.0
@@ -261,6 +267,8 @@ def _search(
             if new_g >= best_g.get(neighbor, inf) - 1e-9:
                 decisions.append(NeighborDecision(neighbor, edge_seconds, new_g, h, new_g + h, "not_better"))
                 continue
+            # A cheaper arrival replaces the old label and remembers the road
+            # used; parent links are followed backward once the goal is popped.
             best_g[neighbor] = new_g
             parent[neighbor] = (current, edge)
             heappush(frontier, (new_g + h, next(serial), neighbor, new_g))

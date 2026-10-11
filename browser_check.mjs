@@ -40,6 +40,9 @@ try {
   assert.match(await page.locator('#neighbor-list').innerText(), /Added/);
   assert.match(await page.locator('#frontier-list .next').innerText(), /West Tunnel South/);
   assert.match(await page.locator('#heuristic-working').innerText(), /km ÷ 15 km\/h/);
+  assert.match(await page.locator('#map-stage').innerText(), /SEARCH 1\/11.*Science Hall/);
+  assert.equal(await page.locator('.edge-cost').count(), await page.locator('#neighbor-list .neighbor-row').count());
+  assert.equal(await page.locator('#legend-label').innerText(), 'Road checked now');
   const mapWidth = await page.locator('.simulation').evaluate((element) => element.getBoundingClientRect().width);
   assert.ok(mapWidth >= 450 && mapWidth <= 520, `map width ${mapWidth}`);
   await page.setViewportSize({width: 1366, height: 650});
@@ -61,10 +64,24 @@ try {
   assert.ok(mobile.mapHeight > 300, JSON.stringify(mobile));
   await page.setViewportSize({width: 1536, height: 690});
 
+  await page.locator('#show-final').click();
+  await page.screenshot({path: 'final-route-qa.png'});
+  assert.match(await page.locator('#map-stage').innerText(), /FINAL FASTEST ROUTE/);
+  assert.match(await page.locator('#step-node').innerText(), /North Library/);
+  assert.equal(await page.locator('.edge-cost-route').count(), 3);
+  assert.equal(await page.locator('#legend-label').innerText(), 'Chosen route');
+  await page.getByRole('button', {name: /Previous expansion/}).click();
+  assert.match(await page.locator('#map-stage').innerText(), /SEARCH 11\/11/);
+  await page.locator('#trace-list button').first().click();
+
   await page.getByRole('button', {name: /Next expansion/}).click();
   assert.match(await page.locator('#step-count').innerText(), /2 OF/);
   assert.match(await page.locator('#neighbor-summary').innerText(), /added to queue/);
   assert.match(await page.locator('#frontier-list .next').innerText(), /East Lecture Hall/);
+  await page.locator('#trace-list button').nth(9).click();
+  await page.locator('#play-search').click();
+  await page.waitForFunction(() => document.querySelector('#map-stage')?.textContent?.includes('FINAL FASTEST ROUTE'), {timeout: 5000});
+  assert.match(await page.locator('#step-node').innerText(), /North Library/);
   await page.locator('#view-source').click();
   await page.waitForFunction(() => document.querySelector('#source-code')?.textContent?.includes('def _search('));
   assert.match(await page.locator('#source-code').innerText(), /def _search\(/);

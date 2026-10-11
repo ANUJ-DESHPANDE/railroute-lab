@@ -155,7 +155,7 @@ def make_pdf():
         y -= 22
     y -= 3
     y = paragraph(pdf, f"Final route: <b>{' - '.join(off.path)}</b>. Its three road times add to <b>{off.travel_seconds / 60:.2f} minutes</b>. A* expanded {off.nodes_expanded} nodes; Dijkstra expanded {baseline.nodes_expanded} and returned the same minimum time.", y, small)
-    y = paragraph(pdf, "<b>Why Dijkstra?</b> It is the same search with h=0, so it is an independent baseline for route cost. A* may explore fewer nodes because h guides it, but that is not guaranteed on every input. Tiny runtime measurements are noisy; compare exact cost and expansion counts first.", y, small)
+    y = paragraph(pdf, "<b>Why Dijkstra?</b> It is the same search engine with h=0, so it is a comparison baseline for route cost. Agreement is a consistency check, not independent proof. A* may explore fewer nodes because h guides it, but that is not guaranteed on every input. Tiny runtime measurements are noisy; compare exact cost and expansion counts first.", y, small)
     pdf.showPage()
 
     y = page(pdf, 3, "Defend the demonstration", "Observed scenarios, tests, assumptions, and honest limits")

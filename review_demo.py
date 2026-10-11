@@ -23,12 +23,18 @@ def main() -> None:
     graph, _ = graph_for_seed(args.seed)
     closures = {TUNNELS[name] for name in args.close}
 
-    a = astar(graph, args.start, args.goal, args.time, closures)
+    trace = []
+    a = astar(graph, args.start, args.goal, args.time, closures, trace)
     d = dijkstra(graph, args.start, args.goal, args.time, closures)
     reliable = reliable_route(graph, args.start, args.goal, args.time, closures)
     print(f"TRIP  {args.start} -> {args.goal} | {args.time} | seed {args.seed} | closed: {', '.join(args.close) or 'none'}")
     if a is None:
         print("No route exists under these conditions.")
+        print(f"A* explored {len(trace)} reachable locations before its queue emptied:")
+        for index, step in enumerate(trace, 1):
+            closed = [choice.destination for choice in step.neighbors if choice.outcome == "closed"]
+            print(f"{index:>2}. {step.node}" + (f" | closed road toward {', '.join(closed)}" if closed else ""))
+        print(f"Dijkstra agrees: {'no route' if d is None else 'route found'}.")
         return
     print(f"A* FASTEST  {' -> '.join(a.path)}")
     print(f"ETA {a.travel_seconds / 60:.2f} min | distance {a.distance_km:.2f} km | expanded {a.nodes_expanded} nodes")

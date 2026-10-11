@@ -1,0 +1,115 @@
+{
+  "model": "Fictional 14-node, 17-road graph; synthetic road times and congestion",
+  "method": "All ordered start/goal pairs for five seeds, six times, and four tunnel states",
+  "seeds": [
+    0,
+    1,
+    7,
+    17,
+    42
+  ],
+  "times": [
+    "07:00",
+    "08:30",
+    "10:00",
+    "12:00",
+    "16:00",
+    "19:00"
+  ],
+  "closure_states": [
+    "open",
+    "west_closed",
+    "east_closed",
+    "both_closed"
+  ],
+  "individual_cases": [
+    {
+      "case": "off_peak_open",
+      "time": "12:00",
+      "closures": "open",
+      "astar_path": [
+        "Science Hall",
+        "West Tunnel South",
+        "West Tunnel North",
+        "North Library"
+      ],
+      "astar_minutes": 8.3,
+      "dijkstra_minutes": 8.3,
+      "astar_expanded": 11,
+      "dijkstra_expanded": 14
+    },
+    {
+      "case": "morning_open",
+      "time": "08:30",
+      "closures": "open",
+      "astar_path": [
+        "Science Hall",
+        "East Lecture Hall",
+        "East Tunnel South",
+        "East Tunnel North",
+        "Birch Residence",
+        "North Library"
+      ],
+      "astar_minutes": 12.464,
+      "dijkstra_minutes": 12.464,
+      "astar_expanded": 11,
+      "dijkstra_expanded": 13
+    },
+    {
+      "case": "off_peak_west_closed",
+      "time": "12:00",
+      "closures": "west_closed",
+      "astar_path": [
+        "Science Hall",
+        "East Lecture Hall",
+        "East Tunnel South",
+        "East Tunnel North",
+        "Birch Residence",
+        "North Library"
+      ],
+      "astar_minutes": 9.167,
+      "dijkstra_minutes": 9.167,
+      "astar_expanded": 10,
+      "dijkstra_expanded": 11
+    },
+    {
+      "case": "off_peak_east_closed",
+      "time": "12:00",
+      "closures": "east_closed",
+      "astar_path": [
+        "Science Hall",
+        "West Tunnel South",
+        "West Tunnel North",
+        "North Library"
+      ],
+      "astar_minutes": 8.3,
+      "dijkstra_minutes": 8.3,
+      "astar_expanded": 10,
+      "dijkstra_expanded": 12
+    },
+    {
+      "case": "off_peak_both_closed",
+      "time": "12:00",
+      "closures": "both_closed",
+      "astar_path": null,
+      "astar_minutes": null,
+      "dijkstra_minutes": null,
+      "astar_expanded": null,
+      "dijkstra_expanded": null
+    }
+  ],
+  "aggregate": {
+    "cases": 23520,
+    "reachable_cases": 20640,
+    "unreachable_cases": 2880,
+    "cost_or_reachability_disagreements": 0,
+    "astar_total_expansions_on_reachable": 115539,
+    "dijkstra_total_expansions_on_reachable": 144720,
+    "astar_mean_expansions_on_reachable": 5.598,
+    "dijkstra_mean_expansions_on_reachable": 7.012,
+    "astar_fewer": 13647,
+    "equal_expansions": 6993,
+    "astar_more": 0
+  },
+  "caveat": "Dijkstra is the same search engine with h=0; agreement is a useful consistency check, not independent proof of optimality."
+}
