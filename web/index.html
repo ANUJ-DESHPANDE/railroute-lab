@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080f1b">
+  <title>VIT Shuttle Lab — Time-aware route intelligence</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand"><div class="brand-mark">V<span>●</span></div><div><strong>SHUTTLE LAB</strong><small>VIT VELLORE · ROUTE INTELLIGENCE</small></div></div>
+      <div class="top-status"><span class="pulse"></span> SIMULATION ONLINE <span class="top-divider"></span> REVIEW 02 PROTOTYPE</div>
+    </header>
+    <main class="layout">
+      <aside class="panel controls">
+        <div class="eyebrow">01 / MISSION CONTROL</div>
+        <h1>Find the smarter way across campus.</h1>
+        <p class="intro">Set your trip, change the conditions, and watch the search engine choose a route.</p>
+        <form id="route-form">
+          <label for="start">DEPART FROM</label>
+          <select id="start" name="start"></select>
+          <label for="goal">TRAVEL TO</label>
+          <select id="goal" name="goal"></select>
+          <label for="departure">DEPARTURE TIME</label>
+          <input id="departure" name="departure" type="time" value="12:00" required>
+          <div class="divider"></div>
+          <div class="field-title">ROUTE OBJECTIVE</div>
+          <div class="mode-switch" role="group" aria-label="Route objective">
+            <button type="button" class="mode active" data-mode="fastest"><span>⚡</span> Fastest</button>
+            <button type="button" class="mode" data-mode="reliable"><span>◈</span> Reliable</button>
+          </div>
+          <p class="field-hint" id="mode-explainer">Minimize expected travel time with time-dependent A*.</p>
+          <div class="divider"></div>
+          <div class="field-title">DISRUPTION SCENARIO</div>
+          <label class="toggle-row"><span><b>West rail underpass</b><small>Close this crossing</small></span><input type="checkbox" id="close-west"><i></i></label>
+          <label class="toggle-row"><span><b>East rail underpass</b><small>Close this crossing</small></span><input type="checkbox" id="close-east"><i></i></label>
+          <button class="primary-btn" type="submit">CALCULATE ROUTE <span>↗</span></button>
+        </form>
+        <div class="assumption"><span>ⓘ</span><p>Campus-inspired schematic. Landmark names and railway split are grounded in maps; stop positions, roads, times and traffic are simulation assumptions.</p></div>
+      </aside>
+      <section class="viewport-wrap" aria-label="3D shuttle route map">
+        <div class="viewport" id="scene"></div>
+        <div class="map-overlay top-left"><div class="map-kicker">LIVE NETWORK MODEL</div><div class="map-title">Vellore Campus <span>/ 3D View</span></div></div>
+        <div class="map-overlay top-right"><span class="mini-dot cyan"></span> ROAD <span class="mini-dot amber"></span> SELECTED ROUTE <span class="mini-dot violet"></span> RAILWAY</div>
+        <div class="map-overlay bottom-left"><button id="replay" type="button">▶ REPLAY SHUTTLE</button><span>DRAG TO ORBIT · SCROLL TO ZOOM</span></div>
+        <div class="map-overlay bottom-right"><span class="live-dot"></span> ROUTE ENGINE ACTIVE</div>
+        <div id="labels" aria-hidden="true"></div>
+      </section>
+      <aside class="panel analysis">
+        <div class="eyebrow">02 / DECISION REPORT</div>
+        <div class="report-heading"><h2>Route intelligence</h2><span id="period-pill">MORNING PEAK</span></div>
+        <div id="error" class="error" hidden></div>
+        <div class="hero-number"><span id="eta">—</span><small>MIN<br>ETA</small></div>
+        <div class="route-name" id="route-name">Choose a trip to begin</div>
+        <div class="metric-grid">
+          <div><small>DISTANCE</small><strong id="distance">—</strong></div>
+          <div><small>NODES EXPANDED</small><strong id="expanded">—</strong></div>
+          <div><small>RELIABLE P90</small><strong id="p90">—</strong></div>
+          <div><small>ALTERNATE PATHS</small><strong id="paths">—</strong></div>
+        </div>
+        <div class="section-heading"><span>SEARCH COMPARISON</span><small>A* vs Dijkstra</small></div>
+        <div class="comparison"><div><span>A* SEARCH</span><b id="astar-nodes">—</b></div><div class="bar"><i id="astar-bar"></i></div><div><span>DIJKSTRA</span><b id="dijkstra-nodes">—</b></div><div class="bar muted"><i id="dijkstra-bar"></i></div><p>Both must agree on the minimum travel time. A* uses a safe straight-line estimate to guide expansion.</p></div>
+        <div id="verification" class="verification">Waiting for search verification</div>
+        <div class="section-heading"><span>SEARCH TRACE</span><small>g + h = f</small></div>
+        <div id="trace" class="trace"></div>
+        <div class="section-heading"><span>ROUTE BREAKDOWN</span><small>road by road</small></div>
+        <ol id="steps" class="steps"></ol>
+      </aside>
+    </main>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
