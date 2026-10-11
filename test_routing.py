@@ -36,11 +36,22 @@ class RoutingTests(unittest.TestCase):
         self.assertIn("East Tunnel South", closed.path)
         self.assertNotIn("West Tunnel South", closed.path)
         self.assertEqual(off_peak.nodes_expanded, len(off_peak.expansions))
+        self.assertTrue(any(choice.outcome == "queued" for choice in off_peak.expansions[0].neighbors))
+        for expansion in off_peak.expansions:
+            for choice in expansion.neighbors:
+                if choice.outcome != "closed":
+                    self.assertAlmostEqual(choice.candidate_g_seconds, expansion.g_seconds + choice.road_seconds)
+                    self.assertAlmostEqual(choice.candidate_f_seconds, choice.candidate_g_seconds + choice.candidate_h_seconds)
+            self.assertEqual(tuple(item.f_seconds for item in expansion.frontier_after),
+                             tuple(sorted(item.f_seconds for item in expansion.frontier_after)))
+        for current, following in zip(off_peak.expansions, off_peak.expansions[1:]):
+            self.assertEqual(current.frontier_after[0].node, following.node)
         self.assertIsNone(astar(graph, "Science Hall", "North Library", "12:00", {WEST_TUNNEL, EAST_TUNNEL}))
         failed_trace = []
         self.assertIsNone(astar(graph, "Science Hall", "North Library", "12:00", {WEST_TUNNEL, EAST_TUNNEL}, failed_trace))
         self.assertGreater(len(failed_trace), 1)
         self.assertNotIn("North Library", [step.node for step in failed_trace])
+        self.assertTrue(any(choice.outcome == "closed" for step in failed_trace for choice in step.neighbors))
 
     def test_reliable_mode_optimizes_declared_small_graph_model(self) -> None:
         graph, _ = generate_map(DEFAULT_SEED)

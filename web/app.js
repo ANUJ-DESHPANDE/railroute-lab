@@ -24,12 +24,6 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 sceneHost.appendChild(renderer.domElement);
-const vehicleHost = $('#vehicle-scene');
-const vehicleCamera = new THREE.PerspectiveCamera(43, 1, 0.1, 100);
-const vehicleRenderer = new THREE.WebGLRenderer({antialias: true});
-vehicleRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-vehicleRenderer.outputColorSpace = THREE.SRGBColorSpace;
-vehicleHost.appendChild(vehicleRenderer.domElement);
 const mapFrame = document.querySelector('.map-frame');
 const mapLabels = [];
 
@@ -280,8 +274,6 @@ function drawRoute(path) {
   scene.add(routeGroup);
   currentPath = path;
   bus.visible = path.length > 0;
-  $('#vehicle-focus').hidden = !bus.visible;
-  resize();
   animationTime = 0;
   playing = path.length > 1;
   placeBus(0);
@@ -321,12 +313,6 @@ function resize() {
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  const detailWidth = vehicleHost.clientWidth, detailHeight = vehicleHost.clientHeight;
-  if (detailWidth && detailHeight) {
-    vehicleRenderer.setSize(detailWidth, detailHeight, false);
-    vehicleCamera.aspect = detailWidth / detailHeight;
-    vehicleCamera.updateProjectionMatrix();
-  }
 }
 window.addEventListener('resize', resize);
 new ResizeObserver(resize).observe(sceneHost);
@@ -358,12 +344,6 @@ function render() {
     if (animationTime >= 10) playing = false;
   }
   renderer.render(scene, camera);
-  if (bus.visible) {
-    const offset = new THREE.Vector3(2.8, 1.9, 3.5).applyQuaternion(bus.quaternion);
-    vehicleCamera.position.copy(bus.position).add(offset);
-    vehicleCamera.lookAt(bus.position.x, bus.position.y + 0.55, bus.position.z);
-    vehicleRenderer.render(scene, vehicleCamera);
-  }
   positionMapLabels();
 }
 render();
@@ -410,11 +390,57 @@ function selectTrace(index) {
   $('#step-g').textContent = `${minutes(item.g_seconds)} min`;
   $('#step-h').textContent = `${minutes(item.h_seconds)} min`;
   $('#step-f').textContent = `${minutes(item.f_seconds)} min`;
+  const here = graph.locations.find((location) => location.name === item.node);
+  const goal = graph.locations.find((location) => location.name === routeData.input.goal);
+  const straightKm = Math.hypot(here.east_km - goal.east_km, here.north_km - goal.north_km);
+  $('#heuristic-working').textContent = `${straightKm.toFixed(2)} km ÷ ${graph.max_speed_kmh} km/h = ${minutes(item.h_seconds)} min`;
+  const choices = item.neighbors || [];
+  const queued = choices.filter((choice) => choice.outcome === 'queued').length;
+  const closed = choices.filter((choice) => choice.outcome === 'closed').length;
   $('#decision-text').textContent = item.node === routeData.input.goal
-    ? 'Goal reached. Follow the saved parent links backward to reconstruct the best route.'
+    ? 'The goal was removed from the queue. Follow saved parent links backward to reconstruct the minimum-cost path.'
     : !routeData.astar && currentTrace === entries.length - 1
-      ? 'No open nodes remain after this expansion. The destination is unreachable under these closures.'
-      : `A* removed ${item.node} from the priority queue. It now tests open neighboring roads and updates any cheaper arrival times.`;
+      ? 'After checking these roads, the queue emptied before the goal was reached. No connected route exists.'
+      : `A* removed ${item.node}, the lowest-f waiting location. ${queued} road${queued === 1 ? '' : 's'} gave a better arrival${closed ? `; ${closed} closed road${closed === 1 ? ' was' : 's were'} ignored` : ''}.`;
+  $('#neighbor-summary').textContent = item.node === routeData.input.goal
+    ? 'Goal reached; search stops'
+    : `${queued} added to queue · ${choices.length - queued} skipped`;
+  $('#neighbor-list').replaceChildren();
+  if (!choices.length) {
+    const empty = document.createElement('p');
+    empty.className = 'neighbor-empty';
+    empty.textContent = item.node === routeData.input.goal ? 'No more roads need checking.' : 'No outgoing roads.';
+    $('#neighbor-list').appendChild(empty);
+  }
+  for (const choice of choices) {
+    const row = document.createElement('div'); row.className = `neighbor-row outcome-${choice.outcome}`;
+    const name = document.createElement('strong'); name.textContent = choice.destination;
+    const edge = document.createElement('span'); edge.textContent = choice.road_seconds == null ? '—' : `${minutes(choice.road_seconds)} min`;
+    const score = document.createElement('span');
+    score.textContent = choice.candidate_f_seconds == null ? '—' : `${minutes(choice.candidate_f_seconds)} min`;
+    if (choice.candidate_f_seconds != null) score.title = `g ${minutes(choice.candidate_g_seconds)} + h ${minutes(choice.candidate_h_seconds)}`;
+    const outcome = document.createElement('b');
+    outcome.textContent = ({queued: 'Added', closed: 'Closed', settled: 'Settled', not_better: 'No gain'})[choice.outcome] || choice.outcome;
+    row.append(name, edge, score, outcome);
+    $('#neighbor-list').appendChild(row);
+  }
+  const pending = item.frontier_after || [];
+  $('#frontier-list').replaceChildren();
+  $('#frontier-next').textContent = pending.length ? `${pending.length} waiting · lowest f next` : 'Queue empty';
+  if (!pending.length) {
+    const empty = document.createElement('p'); empty.className = 'frontier-empty';
+    empty.textContent = item.node === routeData.input.goal ? 'Goal reached. Search complete.' : 'No other location is waiting.';
+    $('#frontier-list').appendChild(empty);
+  }
+  pending.forEach((candidate, rank) => {
+    const row = document.createElement('div'); row.className = `frontier-row ${rank === 0 ? 'next' : ''}`;
+    const order = document.createElement('b'); order.textContent = rank === 0 ? 'NEXT' : `#${rank + 1}`;
+    const name = document.createElement('span'); name.textContent = candidate.node;
+    const arithmetic = document.createElement('small'); arithmetic.textContent = `${minutes(candidate.g_seconds)} + ${minutes(candidate.h_seconds)}`;
+    const score = document.createElement('strong'); score.textContent = `${minutes(candidate.f_seconds)} min`;
+    row.append(order, name, arithmetic, score);
+    $('#frontier-list').appendChild(row);
+  });
   document.querySelectorAll('#trace-list button').forEach((button, i) => button.classList.toggle('active', i === currentTrace));
   focusRing.position.copy(point(item.node, 0.15));
   focusRing.visible = true;
@@ -427,6 +453,11 @@ function updateAlgorithm() {
     $('#step-node').textContent = 'No nodes explored';
     for (const id of ['#step-g', '#step-h', '#step-f']) $(id).textContent = '—';
     $('#decision-text').textContent = 'Change the inputs and run the search again.';
+    $('#neighbor-summary').textContent = 'No roads checked';
+    $('#neighbor-list').replaceChildren();
+    $('#frontier-list').replaceChildren();
+    $('#frontier-next').textContent = 'No queue';
+    $('#heuristic-working').textContent = 'straight-line distance ÷ 15 km/h';
     focusRing.visible = false;
     return;
   }
@@ -434,7 +465,8 @@ function updateAlgorithm() {
     const button = document.createElement('button');
     const number = document.createElement('b'); number.textContent = `#${index + 1}`;
     const name = document.createElement('small'); name.textContent = entry.node;
-    button.append(number, name);
+    const score = document.createElement('span'); score.textContent = `f ${minutes(entry.f_seconds)}`;
+    button.append(number, name, score);
     button.title = `${entry.node}: g ${minutes(entry.g_seconds)} + h ${minutes(entry.h_seconds)} = f ${minutes(entry.f_seconds)} min`;
     button.addEventListener('click', () => selectTrace(index));
     $('#trace-list').appendChild(button);
@@ -457,11 +489,11 @@ function updateResults() {
     $('#verified').textContent = 'No reachable route';
     $('#verified').classList.add('failed');
     $('#route-path').textContent = 'The graph has no open connection between these locations.';
+    $('#route-reason').textContent = 'A* exhausted every reachable road without reaching the destination.';
     for (const id of ['#astar-time', '#dijkstra-time']) $(id).textContent = '—';
     $('#astar-nodes').textContent = routeData.astar_trace.length;
     $('#dijkstra-nodes').textContent = routeData.dijkstra_trace.length;
-    $('#astar-runtime').textContent = `${routeData.runtime_ms.astar.toFixed(3)} ms`;
-    $('#dijkstra-runtime').textContent = `${routeData.runtime_ms.dijkstra.toFixed(3)} ms`;
+    $('#comparison-insight').textContent = 'Both methods explored the reachable part of the network and found no path.';
     $('#legs').replaceChildren();
     $('#reliable-values').textContent = 'No candidate route is available.';
     showPath('fastest');
@@ -475,12 +507,20 @@ function updateResults() {
   $('#verified').textContent = routeData.verified_optimum ? '✓ A* and Dijkstra agree on the optimum' : 'Search mismatch: inspect the core';
   $('#verified').classList.toggle('failed', !routeData.verified_optimum);
   $('#route-path').textContent = a.path.join('  →  ');
+  const tunnel = a.path.includes('West Tunnel South') ? 'west tunnel' : a.path.includes('East Tunnel South') ? 'east tunnel' : null;
+  $('#route-reason').textContent = tunnel
+    ? `Uses the ${tunnel}. Its ${routeData.steps.length} road times add to ${minutes(a.travel_seconds)} minutes.`
+    : `This trip stays on one side of the railway. ${routeData.steps.length} road times add to ${minutes(a.travel_seconds)} minutes.`;
   $('#astar-time').textContent = `${minutes(a.travel_seconds)} min`;
   $('#astar-nodes').textContent = a.nodes_expanded;
-  $('#astar-runtime').textContent = `${routeData.runtime_ms.astar.toFixed(3)} ms`;
   $('#dijkstra-time').textContent = `${minutes(d.travel_seconds)} min`;
   $('#dijkstra-nodes').textContent = d.nodes_expanded;
-  $('#dijkstra-runtime').textContent = `${routeData.runtime_ms.dijkstra.toFixed(3)} ms`;
+  const saved = d.nodes_expanded - a.nodes_expanded;
+  $('#comparison-insight').textContent = saved > 0
+    ? `Both found the same best time. A* expanded ${saved} fewer location${saved === 1 ? '' : 's'} because h guided the queue.`
+    : saved === 0
+      ? 'Both found the same best time and expanded the same number of locations for this input.'
+      : `Both found the same best time. Here A* expanded ${-saved} more location${saved === -1 ? '' : 's'}; the heuristic did not help on this input.`;
   $('#legs').replaceChildren();
   for (const step of routeData.steps) {
     const row = document.createElement('div'); row.className = 'leg';

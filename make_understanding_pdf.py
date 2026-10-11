@@ -124,7 +124,7 @@ def make_pdf():
 
     y = page(pdf, 2, "Explain the AI core", "A*, the heuristic, and a worked search on the default map")
     y = heading(pdf, "The decision rule", y)
-    y = paragraph(pdf, "A* keeps candidate locations in a priority queue ordered by <b>f(n) = g(n) + h(n)</b>. <b>g</b> is actual modeled travel time from the start to n. <b>h</b> is an optimistic estimate of remaining time. The algorithm pops the smallest f, relaxes open neighboring roads, saves a parent when it finds a cheaper arrival, and stops when it pops the goal. Following parents backwards reconstructs the route.", y)
+    y = paragraph(pdf, "A* keeps candidate locations in a priority queue ordered by <b>f(n) = g(n) + h(n)</b>. <b>g</b> is actual modeled travel time from the start to n. <b>h</b> is an optimistic estimate of remaining time. The algorithm pops the smallest f, relaxes open neighboring roads, saves a parent when it finds a cheaper arrival, and stops when it pops the goal. The dashboard shows each road decision and the resulting queue. Following parents backwards reconstructs the route.", y)
     y = paragraph(pdf, "Our heuristic is <b>straight-line distance from n to goal / 15 km/h</b>, converted to seconds. Example: 0.50 km implies at least 2 minutes. Every modeled road is at least as long as straight-line distance, free-flow speed never exceeds 15 km/h, and congestion multipliers are at least 1. Therefore h cannot overestimate the remaining road time. The same triangle/edge bound makes it consistent; after a node is popped, its best arrival is final under this FIFO road model.", y)
     y = heading(pdf, "Pseudocode in plain words", y - 1)
     for line in (

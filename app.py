@@ -13,7 +13,7 @@ from pathlib import Path
 from time import perf_counter
 from urllib.parse import parse_qs, urlparse
 
-from routing import astar, congestion_period, dijkstra, edge_travel_seconds, estimated_p90_seconds, reliable_route
+from routing import MAX_SHUTTLE_SPEED_KMH, astar, congestion_period, dijkstra, edge_travel_seconds, estimated_p90_seconds, reliable_route
 from sample_map import DEFAULT_SEED, EAST_TUNNEL, WEST_TUNNEL, generate_map
 
 
@@ -55,6 +55,7 @@ def graph_payload(seed: int) -> dict:
         "roads": roads,
         "tunnels": TUNNELS,
         "seed": seed,
+        "max_speed_kmh": MAX_SHUTTLE_SPEED_KMH,
         "data_status": "Fictional, seeded campus. Railway crossings exist only at the two road tunnels. Distances, congestion, and delay spread are generated simulation values.",
     }
 

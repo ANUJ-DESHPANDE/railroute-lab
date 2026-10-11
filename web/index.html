@@ -10,15 +10,9 @@
 </head>
 <body>
   <div class="app-shell">
-    <header class="masthead">
-      <div class="identity"><span class="brand-symbol">R<span></span></span><span><strong>RAILROUTE</strong><small>AI SEARCH LAB</small></span></div>
-      <p>A reproducible, fictional campus routing experiment</p>
-      <div class="masthead-right"><span class="server-dot"></span> Python search core <span class="masthead-separator"></span> A* / Dijkstra</div>
-    </header>
-
     <main class="quadrants">
       <section class="quadrant inputs" aria-labelledby="inputs-title">
-        <div class="section-head"><span class="section-index">01</span><div><p class="section-eyebrow">DEFINE THE PROBLEM</p><h1 id="inputs-title">Trip inputs</h1></div></div>
+        <div class="section-head"><div><p class="section-eyebrow">DEFINE THE PROBLEM</p><h1 id="inputs-title">Trip inputs</h1></div></div>
         <p class="section-subtitle">Set the trip and test how the route changes.</p>
         <form id="route-form">
           <div class="field-pair">
@@ -40,18 +34,35 @@
       </section>
 
       <section class="quadrant algorithm" aria-labelledby="algorithm-title">
-        <div class="section-head"><span class="section-index">02</span><div><p class="section-eyebrow">THE AI CORE</p><h2 id="algorithm-title">Inside A* search</h2></div><button class="source-link" id="view-source" type="button">View source ↗</button></div>
-        <p class="section-subtitle">Inspect each node A* chose to expand, in order.</p>
-        <div class="formula-row">
-          <div class="formula-cell"><span>g(n)</span><strong id="step-g">—</strong><small>time already spent</small></div>
-          <div class="formula-sign">+</div>
-          <div class="formula-cell"><span>h(n)</span><strong id="step-h">—</strong><small>safe time estimate</small></div>
-          <div class="formula-sign">=</div>
-          <div class="formula-cell total"><span>f(n)</span><strong id="step-f">—</strong><small>priority in the queue</small></div>
+        <div class="section-head"><div><p class="section-eyebrow">THE AI CORE</p><h2 id="algorithm-title">Inside A* search</h2></div><button class="source-link" id="view-source" type="button">View source ↗</button></div>
+        <p class="section-subtitle">Follow the choice A* makes at each expanded location.</p>
+        <div class="search-primer">
+          <div class="formula-wrap">
+            <div class="formula-row">
+              <div class="formula-cell"><span>g(n)</span><strong id="step-g">—</strong><small>travelled so far</small></div>
+              <div class="formula-sign">+</div>
+              <div class="formula-cell"><span>h(n)</span><strong id="step-h">—</strong><small>optimistic time left</small></div>
+              <div class="formula-sign">=</div>
+              <div class="formula-cell total"><span>f(n)</span><strong id="step-f">—</strong><small>queue priority</small></div>
+            </div>
+            <p class="formula-note">A* expands the waiting location with the lowest <strong>f</strong>. The road table below shows what it did next.</p>
+          </div>
+          <div class="heuristic-card"><span class="mini-head">WHY h(n) IS SAFE</span><strong id="heuristic-working">straight-line distance ÷ 15 km/h</strong><p id="heuristic-explanation">Roads are never shorter than a straight line, and modeled speed never exceeds 15 km/h. So h cannot overestimate.</p></div>
         </div>
-        <div class="step-caption"><div><span class="overline">EXPANSION <span id="step-count">—</span></span><h3 id="step-node">Run a search to inspect it</h3></div><div class="step-arrows"><button id="previous-step" type="button" aria-label="Previous expansion">←</button><button id="next-step" type="button" aria-label="Next expansion">→</button></div></div>
-        <div id="decision-text" class="decision-text">The selected location is removed from the priority queue because its f score is currently smallest.</div>
-        <div id="trace-list" class="trace-list" aria-label="Search expansion sequence"></div>
+        <div class="algorithm-main">
+          <div class="expansion-side">
+            <div class="step-caption"><div><span class="overline">EXPANSION <span id="step-count">—</span></span><h3 id="step-node">Run a search to inspect it</h3></div><div class="step-arrows"><button id="previous-step" type="button" aria-label="Previous expansion">←</button><button id="next-step" type="button" aria-label="Next expansion">→</button></div></div>
+            <div id="decision-text" class="decision-text">The selected location is removed from the priority queue because its f score is currently smallest.</div>
+            <div class="trace-label mini-head">EXPANSION ORDER <span>select any step</span></div>
+            <div id="trace-list" class="trace-list" aria-label="Search expansion sequence"></div>
+          </div>
+          <div class="roads-side">
+            <div class="roads-heading"><span class="mini-head">ROADS CHECKED AT THIS STEP</span><span id="neighbor-summary">Awaiting a run</span></div>
+            <div class="neighbor-table"><div class="neighbor-table-head"><span>Road to</span><span>Edge time</span><span>Candidate f</span><span>Decision</span></div><div id="neighbor-list"></div></div>
+            <div class="frontier-panel"><div class="frontier-heading"><span class="mini-head">WAITING LOCATIONS AFTER THIS STEP</span><span id="frontier-next">Lowest f is next</span></div><div id="frontier-list"></div></div>
+            <p class="neighbor-help">A road enters the queue only when its arrival time improves. The next location is the waiting one with the lowest <strong>f = g + h</strong>.</p>
+          </div>
+        </div>
         <div class="algorithm-bottom">
           <div class="pseudocode"><div class="mini-head">THE DECISION LOOP <span>routing.py</span></div><code>pop lowest f from priority queue<br>if goal: reconstruct route<br>for each open neighboring road:<br>&nbsp;&nbsp;new g = g + travel time at arrival<br>&nbsp;&nbsp;if better: push with f = g + h</code></div>
           <div class="formulation"><div class="mini-head">SEARCH FORMULATION</div><dl><dt>State</dt><dd>Current location + arrival time</dd><dt>Action</dt><dd>Traverse a connected road</dd><dt>Goal</dt><dd>Reach the destination</dd><dt>Cost</dt><dd>Seconds spent travelling</dd></dl></div>
@@ -60,23 +71,21 @@
       </section>
 
       <section class="quadrant evidence" aria-labelledby="evidence-title">
-        <div class="evidence-primary">
-          <div class="section-head"><span class="section-index">03</span><div><p class="section-eyebrow">OUTPUT</p><h2 id="evidence-title">Route evidence</h2></div></div>
-          <div id="error" class="error" hidden></div>
-          <div class="result-top"><div><span class="overline">MINIMUM TRAVEL TIME</span><div class="eta"><span id="eta">—</span><small>minutes</small></div></div><div id="verified" class="verified">Waiting for a run</div></div>
-          <div id="route-path" class="route-path">The selected path will appear here.</div>
-        </div>
-        <div class="comparison"><div class="mini-head">SAME INPUT, TWO SEARCHES</div><table><thead><tr><th>Algorithm</th><th>Route time</th><th>Expanded</th><th>Runtime*</th></tr></thead><tbody><tr><th>A* + heuristic</th><td id="astar-time">—</td><td id="astar-nodes">—</td><td id="astar-runtime">—</td></tr><tr><th>Dijkstra (h = 0)</th><td id="dijkstra-time">—</td><td id="dijkstra-nodes">—</td><td id="dijkstra-runtime">—</td></tr></tbody></table><p>* Runtime is machine dependent; route cost and expansion count are the primary comparison.</p></div>
-        <div class="breakdown">
-          <div class="leg-head mini-head">HOW THE PATH COST WAS ADDED</div>
-          <div id="legs" class="legs"></div>
-          <details class="reliability"><summary>Reliability experiment <span id="reliable-summary">Estimated delay risk</span></summary><p>Simple routes are ranked by a modeled 90th-percentile arrival time. Delay values are generated assumptions.</p><div id="reliable-values"></div><button id="show-reliable" type="button">Show reliability route on map</button></details>
+        <div class="section-head"><div><p class="section-eyebrow">SEARCH RESULT</p><h2 id="evidence-title">Route evidence</h2></div></div>
+        <div id="error" class="error" hidden></div>
+        <div class="result-top"><div><span class="overline">MINIMUM TRAVEL TIME</span><div class="eta"><span id="eta">—</span><small>minutes</small></div></div><div id="verified" class="verified">Waiting for a run</div></div>
+        <div id="route-path" class="route-path">The selected path will appear here.</div>
+        <p id="route-reason" class="route-reason">A* sums the travel time of each road and returns the cheapest connected path.</p>
+        <div class="comparison"><div class="mini-head">SAME TRIP, TWO SEARCH METHODS</div><table><thead><tr><th>Method</th><th>Best time</th><th>Nodes expanded</th></tr></thead><tbody><tr><th>A* with heuristic</th><td id="astar-time">—</td><td id="astar-nodes">—</td></tr><tr><th>Dijkstra (h = 0)</th><td id="dijkstra-time">—</td><td id="dijkstra-nodes">—</td></tr></tbody></table><p id="comparison-insight">Equal best time checks the route cost. Expansion counts show whether h helped.</p></div>
+        <div class="evidence-extras">
+          <details class="cost-breakdown"><summary>See road-by-road cost</summary><div id="legs" class="legs"></div></details>
+          <details class="reliability"><summary>Reliability experiment</summary><p>Simple routes are ranked by a modeled 90th-percentile arrival time. Delay values are generated assumptions.</p><div id="reliable-values"></div><button id="show-reliable" type="button">Show reliability route on map</button></details>
         </div>
       </section>
 
       <section class="quadrant simulation" aria-labelledby="simulation-title">
-        <div class="section-head"><span class="section-index">04</span><div><p class="section-eyebrow">VISUAL EVIDENCE</p><h2 id="simulation-title">Shuttle simulation</h2></div><div class="map-actions"><button id="replay" type="button">Replay route ↻</button></div></div>
-        <div class="map-frame"><div id="scene" aria-label="3D schematic map with road network, railway and animated shuttle"></div><div class="vehicle-focus" id="vehicle-focus" hidden><div class="vehicle-focus-head"><strong>SHUTTLE CAM</strong><span>LIVE SIMULATION</span></div><div id="vehicle-scene" aria-label="Close-up of the animated shuttle"></div></div><div class="map-legend"><span><i class="legend-road"></i>Road</span><span><i class="legend-route"></i>Chosen route</span><span><i class="legend-rail"></i>Railway</span></div><div class="playback"><span id="playback-label">Awaiting a route</span><div class="progress-track"><div id="progress-fill"></div></div><span id="playback-time">0%</span></div></div>
+        <div class="section-head"><div><p class="section-eyebrow">VISUAL EVIDENCE</p><h2 id="simulation-title">Shuttle simulation</h2></div><div class="map-actions"><button id="replay" type="button">Replay route ↻</button></div></div>
+        <div class="map-frame"><div id="scene" aria-label="3D schematic map with road network, railway and animated shuttle"></div><div class="map-legend"><span><i class="legend-road"></i>Road</span><span><i class="legend-route"></i>Chosen route</span><span><i class="legend-rail"></i>Railway</span></div><div class="playback"><span id="playback-label">Awaiting a route</span><div class="progress-track"><div id="progress-fill"></div></div><span id="playback-time">0%</span></div></div>
       </section>
     </main>
     <dialog id="source-modal"><div class="source-modal-head"><strong>routing.py · AI core</strong><button id="close-source" type="button">Close ×</button></div><pre id="source-code"></pre></dialog>

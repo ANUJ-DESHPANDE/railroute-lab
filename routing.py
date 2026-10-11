@@ -41,6 +41,30 @@ class SearchExpansion:
     g_seconds: float
     h_seconds: float
     f_seconds: float
+    neighbors: tuple[NeighborDecision, ...] = ()
+    frontier_after: tuple[FrontierEntry, ...] = ()
+
+
+@dataclass(frozen=True)
+class NeighborDecision:
+    """One road considered while expanding a node, including skipped roads."""
+
+    destination: str
+    road_seconds: float | None
+    candidate_g_seconds: float | None
+    candidate_h_seconds: float | None
+    candidate_f_seconds: float | None
+    outcome: str  # queued, closed, settled, or not_better
+
+
+@dataclass(frozen=True)
+class FrontierEntry:
+    """A valid pending node after this expansion, ordered by heap priority."""
+
+    node: str
+    g_seconds: float
+    h_seconds: float
+    f_seconds: float
 
 
 @dataclass(frozen=True)
@@ -193,14 +217,26 @@ def _search(
     expanded: set[str] = set()
     expansion_log: list[SearchExpansion] = trace if trace is not None else []
 
+    def pending_frontier() -> tuple[FrontierEntry, ...]:
+        """Ignore stale heap copies, preserving the heap's actual tie order."""
+        pending = []
+        seen = set()
+        for _, _, node, queued_g in sorted(frontier):
+            if node in expanded or node in seen or queued_g > best_g[node] + 1e-9:
+                continue
+            h = _heuristic_seconds(graph, node, goal) if use_heuristic else 0.0
+            pending.append(FrontierEntry(node, queued_g, h, queued_g + h))
+            seen.add(node)
+        return tuple(pending)
+
     while frontier:
         _, _, current, queued_g = heappop(frontier)
         if queued_g > best_g[current] + 1e-9 or current in expanded:
             continue  # A better entry superseded this heap entry.
         expanded.add(current)
         current_h = _heuristic_seconds(graph, current, goal) if use_heuristic else 0.0
-        expansion_log.append(SearchExpansion(current, best_g[current], current_h, best_g[current] + current_h))
         if current == goal:
+            expansion_log.append(SearchExpansion(current, best_g[current], current_h, best_g[current] + current_h))
             path = [goal]
             distance = 0.0
             while path[-1] != start:
@@ -210,18 +246,29 @@ def _search(
             path.reverse()
             return RouteResult(tuple(path), best_g[goal], distance, len(expanded), period, tuple(expansion_log))
 
+        decisions: list[NeighborDecision] = []
         for edge in graph.neighbors[current]:
             neighbor = edge.destination
             if tuple(sorted((current, neighbor))) in closures:
+                decisions.append(NeighborDecision(neighbor, None, None, None, None, "closed"))
                 continue
             edge_seconds = edge_travel_seconds(edge, departure_clock + best_g[current])
             new_g = best_g[current] + edge_seconds
-            if neighbor in expanded or new_g >= best_g.get(neighbor, inf) - 1e-9:
+            h = _heuristic_seconds(graph, neighbor, goal) if use_heuristic else 0.0
+            if neighbor in expanded:
+                decisions.append(NeighborDecision(neighbor, edge_seconds, new_g, h, new_g + h, "settled"))
+                continue
+            if new_g >= best_g.get(neighbor, inf) - 1e-9:
+                decisions.append(NeighborDecision(neighbor, edge_seconds, new_g, h, new_g + h, "not_better"))
                 continue
             best_g[neighbor] = new_g
             parent[neighbor] = (current, edge)
-            h = _heuristic_seconds(graph, neighbor, goal) if use_heuristic else 0.0
             heappush(frontier, (new_g + h, next(serial), neighbor, new_g))
+            decisions.append(NeighborDecision(neighbor, edge_seconds, new_g, h, new_g + h, "queued"))
+        expansion_log.append(SearchExpansion(
+            current, best_g[current], current_h, best_g[current] + current_h,
+            tuple(decisions), pending_frontier(),
+        ))
     return None
 
 

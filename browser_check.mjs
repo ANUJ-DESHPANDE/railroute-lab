@@ -34,7 +34,14 @@ try {
   assert.match(await page.locator('#route-path').innerText(), /West Tunnel/);
   assert.equal(await page.locator('#astar-time').innerText(), await page.locator('#dijkstra-time').innerText());
   await page.screenshot({path: 'demo-screenshot.png', fullPage: true});
-  assert.equal(await page.locator('#vehicle-focus').isVisible(), true);
+  assert.equal(await page.locator('.masthead').count(), 0);
+  assert.equal(await page.locator('#vehicle-focus').count(), 0);
+  assert.ok(await page.locator('#neighbor-list .neighbor-row').count() > 0);
+  assert.match(await page.locator('#neighbor-list').innerText(), /Added/);
+  assert.match(await page.locator('#frontier-list .next').innerText(), /West Tunnel South/);
+  assert.match(await page.locator('#heuristic-working').innerText(), /km ÷ 15 km\/h/);
+  const mapWidth = await page.locator('.simulation').evaluate((element) => element.getBoundingClientRect().width);
+  assert.ok(mapWidth >= 450 && mapWidth <= 520, `map width ${mapWidth}`);
   await page.setViewportSize({width: 1366, height: 650});
   const compact = await page.evaluate(() => ({
     scrollHeight: document.documentElement.scrollHeight,
@@ -56,6 +63,8 @@ try {
 
   await page.getByRole('button', {name: /Next expansion/}).click();
   assert.match(await page.locator('#step-count').innerText(), /2 OF/);
+  assert.match(await page.locator('#neighbor-summary').innerText(), /added to queue/);
+  assert.match(await page.locator('#frontier-list .next').innerText(), /East Lecture Hall/);
   await page.locator('#view-source').click();
   await page.waitForFunction(() => document.querySelector('#source-code')?.textContent?.includes('def _search('));
   assert.match(await page.locator('#source-code').innerText(), /def _search\(/);
@@ -79,6 +88,10 @@ try {
   assert.equal(await page.locator('#verified').innerText(), 'No reachable route');
   assert.ok(Number(await page.locator('#astar-nodes').innerText()) > 1);
   assert.match(await page.locator('#step-count').innerText(), /OF/);
+  await page.locator('#trace-list button').filter({hasText: 'West Tunnel South'}).click();
+  assert.match(await page.locator('#neighbor-list').innerText(), /Closed/);
+  await page.locator('#trace-list button').last().click();
+  assert.equal(await page.locator('#frontier-next').innerText(), 'Queue empty');
 
   await page.locator('#goal').selectOption('Design Studio');
   await run();

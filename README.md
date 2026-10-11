@@ -10,7 +10,7 @@ Python 3.10+ is sufficient for the core and browser app. Three.js is bundled loc
 python app.py
 ```
 
-Open **http://127.0.0.1:8000**. Choose start, destination, departure time, map seed, and tunnel closures, then select **Run A* search**. The workspace shows exact inputs, a large route map with synchronized shuttle close-up, the A* expansion trace with `g + h = f`, and the Dijkstra comparison. **View source** displays the actual Python search code.
+Open **http://127.0.0.1:8000**. Choose start, destination, departure time, map seed, and tunnel closures, then select **Run A* search**. The workspace shows exact inputs, a compact animated route map, the A* expansion trace with `g + h = f`, every road considered at the selected expansion, and the Dijkstra comparison. **View source** displays the actual Python search code.
 
 Code-first review examples:
 
@@ -46,7 +46,7 @@ Keep `python app.py` running in a second terminal. The check covers the default 
 | Goal test | Current location equals the destination |
 | Path cost | Sum of road travel seconds |
 
-`routing.py` implements A* with `heapq`, best-known arrival times, parent links, and a recorded expansion trace. At each step it expands the node with the lowest `f = g + h`: `g` is elapsed travel time and `h` is straight-line distance to the goal divided by an assumed maximum shuttle speed of 15 km/h. The graph validates that road lengths cannot be shorter than straight-line distance, free-flow times cannot imply a higher speed, and congestion factors are at least one. Thus `h` is an optimistic, consistent lower bound under this model. Dijkstra runs the same core with `h = 0` and serves as a cost baseline. A* and Dijkstra need not take the same path when multiple routes tie, but must agree on the optimum modeled cost and reachability.
+`routing.py` implements A* with `heapq`, best-known arrival times, parent links, and a recorded expansion trace. Each expansion records the roads considered (added, closed, already settled, or no improvement) and the valid pending queue after the decision. At each step A* expands the node with the lowest `f = g + h`: `g` is elapsed travel time and `h` is straight-line distance to the goal divided by an assumed maximum shuttle speed of 15 km/h. The graph validates that road lengths cannot be shorter than straight-line distance, free-flow times cannot imply a higher speed, and congestion factors are at least one. Thus `h` is an optimistic, consistent lower bound under this model. Dijkstra runs the same core with `h = 0` and serves as a cost baseline. A* and Dijkstra need not take the same path when multiple routes tie, but must agree on the optimum modeled cost and reachability.
 
 Each road's progress is integrated through any congestion-period boundary it crosses. This avoids an artificial jump in arrival time for a road entered just before 10:00 or 19:00 and retains the FIFO property required by the label-setting search. Morning peak is 07:00–10:00; evening peak is 16:00–19:00. These periods are experiment assumptions.
 
