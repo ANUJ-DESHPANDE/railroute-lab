@@ -19,6 +19,7 @@ def main() -> None:
     parser.add_argument("--time", default="12:00", help="24-hour HH:MM departure time")
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED, help="Fictional map seed (0–99999)")
     parser.add_argument("--close", action="append", choices=TUNNELS, default=[], help="Close a modeled underpass")
+    parser.add_argument("--show-reliability", action="store_true", help="Also show the optional uncertainty experiment")
     args = parser.parse_args()
     graph, _ = graph_for_seed(args.seed)
     closures = {TUNNELS[name] for name in args.close}
@@ -26,7 +27,6 @@ def main() -> None:
     trace = []
     a = astar(graph, args.start, args.goal, args.time, closures, trace)
     d = dijkstra(graph, args.start, args.goal, args.time, closures)
-    reliable = reliable_route(graph, args.start, args.goal, args.time, closures)
     print(f"TRIP  {args.start} -> {args.goal} | {args.time} | seed {args.seed} | closed: {', '.join(args.close) or 'none'}")
     if a is None:
         print("No route exists under these conditions.")
@@ -46,9 +46,11 @@ def main() -> None:
         print(f"{step['start']} -> {step['end']}: {step['seconds'] / 60:.2f} min")
     print(f"\nDIJKSTRA  {d.travel_seconds / 60:.2f} min | expanded {d.nodes_expanded} nodes")
     print(f"OPTIMUM CHECK  {'PASS' if abs(a.travel_seconds - d.travel_seconds) < 1e-6 else 'FAIL'}")
-    print(f"FASTEST P90 ESTIMATE  {estimated_p90_seconds(graph, a.path, args.time) / 60:.2f} min")
-    print(f"RELIABLE ROUTE  {' -> '.join(reliable.path)}")
-    print(f"RELIABLE ETA / P90  {reliable.expected_seconds / 60:.2f} / {reliable.estimated_p90_seconds / 60:.2f} min")
+    if args.show_reliability:
+        reliable = reliable_route(graph, args.start, args.goal, args.time, closures)
+        print(f"FASTEST P90 ESTIMATE  {estimated_p90_seconds(graph, a.path, args.time) / 60:.2f} min")
+        print(f"RELIABLE ROUTE  {' -> '.join(reliable.path)}")
+        print(f"RELIABLE ETA / P90  {reliable.expected_seconds / 60:.2f} / {reliable.estimated_p90_seconds / 60:.2f} min")
     print("All traffic and uncertainty values are hypothetical simulation inputs.")
 
 

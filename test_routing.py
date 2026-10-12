@@ -37,6 +37,10 @@ class RoutingTests(unittest.TestCase):
         self.assertNotIn("B", closed.path)
         self.assertEqual(off_peak.nodes_expanded, len(off_peak.expansions))
         self.assertTrue(any(choice.outcome == "queued" for choice in off_peak.expansions[0].neighbors))
+        self.assertEqual(
+            [(candidate.node, candidate.via) for candidate in off_peak.expansions[1].frontier_after],
+            [("E", "A"), ("C", "B"), ("I", "A")],
+        )
         for expansion in off_peak.expansions:
             for choice in expansion.neighbors:
                 if choice.outcome != "closed":

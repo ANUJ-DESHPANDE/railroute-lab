@@ -65,6 +65,7 @@ class FrontierEntry:
     g_seconds: float
     h_seconds: float
     f_seconds: float
+    via: str | None
 
 
 @dataclass(frozen=True)
@@ -225,7 +226,7 @@ def _search(
             if node in expanded or node in seen or queued_g > best_g[node] + 1e-9:
                 continue
             h = _heuristic_seconds(graph, node, goal) if use_heuristic else 0.0
-            pending.append(FrontierEntry(node, queued_g, h, queued_g + h))
+            pending.append(FrontierEntry(node, queued_g, h, queued_g + h, parent[node][0] if node in parent else None))
             seen.add(node)
         return tuple(pending)
 

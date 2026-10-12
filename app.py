@@ -126,10 +126,10 @@ class Handler(BaseHTTPRequestHandler):
                 "reliable_steps": route_steps(graph, reliable.path, departure) if reliable else [],
             })
             return
-        if parsed.path in ("/", "/index.html"):
-            file = ROOT / "web" / "index.html"
+        if parsed.path in ("/", "/index.html", "/compare.html"):
+            file = ROOT / "web" / ("compare.html" if parsed.path == "/compare.html" else "index.html")
             content_type = "text/html; charset=utf-8"
-        elif parsed.path in ("/app.js", "/style.css", "/favicon.svg", "/vendor/three.module.js", "/vendor/three.core.js"):
+        elif parsed.path in ("/app.js", "/style.css", "/compare.js", "/compare.css", "/favicon.svg", "/vendor/three.module.js", "/vendor/three.core.js"):
             file = ROOT / "web" / parsed.path.lstrip("/")
             content_type = {".css": "text/css", ".svg": "image/svg+xml"}.get(file.suffix, "text/javascript")
         else:

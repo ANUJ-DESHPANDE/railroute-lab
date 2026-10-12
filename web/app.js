@@ -22,7 +22,7 @@ let walkthroughTimer = null;
 const sceneHost = $('#scene');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xe5e9e5);
-const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+const camera = new THREE.OrthographicCamera(-10, 10, 7, -7, 0.1, 100);
 const renderer = new THREE.WebGLRenderer({antialias: true});
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -31,19 +31,27 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 sceneHost.appendChild(renderer.domElement);
 const mapFrame = document.querySelector('.map-frame');
 const mapLabels = [];
+const labelGuides = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+labelGuides.classList.add('map-label-guides');
+labelGuides.setAttribute('aria-hidden', 'true');
+mapFrame.appendChild(labelGuides);
 
 function setMapLabels() {
   mapLabels.forEach(({element}) => element.remove());
   mapLabels.length = 0;
+  labelGuides.replaceChildren();
   if (!graph) return;
   for (const {name} of graph.locations) {
     const element = document.createElement('div');
     element.className = 'map-label map-node-label';
     const letter = document.createElement('b'); letter.textContent = name;
-    const role = document.createElement('small');
-    element.append(letter, role);
+    element.append(letter);
+    element.title = name;
     mapFrame.appendChild(element);
-    mapLabels.push({element, name});
+    const guide = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    guide.setAttribute('class', 'map-label-guide');
+    labelGuides.appendChild(guide);
+    mapLabels.push({element, name, guide});
   }
   refreshMapRoles();
 }
@@ -55,40 +63,36 @@ function refreshMapRoles() {
     element.classList.toggle('is-start', name === start);
     element.classList.toggle('is-goal', name === goal);
     element.classList.toggle('is-current', name === now);
-    element.querySelector('small').textContent = name === now ? 'NOW' : name === start ? 'START' : name === goal ? 'GOAL' : '';
   }
 }
 
 function positionMapLabels() {
   if (!graph) return;
   const width = mapFrame.clientWidth, height = mapFrame.clientHeight;
-  const entries = mapLabels.map(({element, name}) => {
+  labelGuides.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  const occupied = [];
+  const offsets = [[0, 0], [-38, 0], [38, 0], [0, -38], [0, 38],
+    [38, -38], [-38, -38], [38, 38], [-38, 38], [0, -76], [0, 76]];
+  for (const {element, name, guide} of mapLabels) {
     const p = point(name, 0.25).project(camera);
-    return {element, name, p, x: (p.x + 1) * width / 2, y: (1 - p.y) * height / 2};
-  }).sort((a, b) =>
-    Number(b.element.classList.contains('is-current')) - Number(a.element.classList.contains('is-current')) ||
-    Number(b.element.classList.contains('is-goal')) - Number(a.element.classList.contains('is-goal')) ||
-    Number(b.element.classList.contains('is-start')) - Number(a.element.classList.contains('is-start')));
-  const placed = [];
-  for (const {element, p, x, y} of entries) {
-    if (p.z > 1 || p.z < -1 || x < 0 || x > width || y < 0 || y > height) {
-      element.hidden = true;
-      continue;
-    }
-    const w = element.offsetWidth || 95, h = element.offsetHeight || 22;
-    const candidates = [
-      [x + 8, y - h - 6], [x - w - 8, y - h - 6],
-      [x + 8, y + 5], [x - w - 8, y + 5],
-      [x - w / 2, y - h - 11], [x - w / 2, y + 9],
-    ];
-    let chosen = candidates.find(([left, top]) =>
-      left >= 4 && left + w <= width - 4 && top >= 39 && top + h <= height - 31 &&
-      placed.every(([px, py, pw, ph]) => left > px + pw + 2 || left + w + 2 < px || top > py + ph + 2 || top + h + 2 < py));
-    if (!chosen) chosen = [Math.max(4, Math.min(width - w - 4, x + 7)), Math.max(39, Math.min(height - h - 31, y - h - 5))];
-    element.style.left = `${chosen[0]}px`;
-    element.style.top = `${chosen[1]}px`;
-    element.hidden = false;
-    placed.push([chosen[0], chosen[1], w, h]);
+    const x = (p.x + 1) * width / 2, y = (1 - p.y) * height / 2;
+    const placement = offsets.find(([dx, dy]) => {
+      const px = x + dx, py = y + dy;
+      return px >= 19 && px <= width - 19 && py >= 19 && py <= height - 19 &&
+        occupied.every(([ox, oy]) => Math.abs(px - ox) >= 37 || Math.abs(py - oy) >= 37);
+    });
+    element.hidden = !placement || p.z > 1 || p.z < -1;
+    if (placement) {
+      const [dx, dy] = placement;
+      element.style.left = `${x + dx}px`;
+      element.style.top = `${y + dy}px`;
+      occupied.push([x + dx, y + dy]);
+      guide.setAttribute('x1', String(x));
+      guide.setAttribute('y1', String(y));
+      guide.setAttribute('x2', String(x + dx));
+      guide.setAttribute('y2', String(y + dy));
+      guide.hidden = dx === 0 && dy === 0;
+    } else guide.hidden = true;
   }
   for (const {element, position} of edgeLabels) {
     const p = position.clone().project(camera);
@@ -98,16 +102,10 @@ function positionMapLabels() {
   }
 }
 
-const target = new THREE.Vector3(0, 0, 0);
-let orbitAngle = 0.42;
-let orbitElevation = 1.04;
-let orbitDistance = 23;
+const target = new THREE.Vector3(0, 0, -0.9);
 function positionCamera() {
-  camera.position.set(
-    Math.sin(orbitAngle) * Math.cos(orbitElevation) * orbitDistance,
-    Math.sin(orbitElevation) * orbitDistance,
-    Math.cos(orbitAngle) * Math.cos(orbitElevation) * orbitDistance,
-  );
+  camera.up.set(0, 0, -1);
+  camera.position.set(0, 30, -0.9);
   camera.lookAt(target);
 }
 positionCamera();
@@ -130,9 +128,6 @@ ground.rotation.x = -Math.PI / 2;
 ground.position.y = -0.18;
 ground.receiveShadow = true;
 scene.add(ground);
-const grid = new THREE.GridHelper(22, 32, 0xc6d1cd, 0xcbd5d0);
-grid.position.y = -0.16;
-scene.add(grid);
 
 // Rail embankment. Vehicle roads cross it only through the graph's tunnel edges.
 const railBed = new THREE.Mesh(
@@ -335,6 +330,7 @@ function clearSearchHighlights() {
   clearEdgeLabels();
 }
 function drawSearchStep(item) {
+  mapFrame.classList.add('is-search');
   clearSearchHighlights();
   searchGroup = new THREE.Group();
   for (const choice of item.neighbors || []) {
@@ -342,23 +338,17 @@ function drawSearchStep(item) {
     const color = kind === 'queued' ? 0x167f7c : kind === 'closed' ? 0xb8684f : 0x98a5a2;
     const curve = roadCurve(item.node, choice.destination, 0.19);
     searchGroup.add(makeTube(curve, kind === 'queued' ? 0.11 : 0.07, color, kind === 'queued' ? 1 : 0.8));
-    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.14, 14, 10), new THREE.MeshBasicMaterial({color}));
-    dot.position.copy(point(choice.destination, 0.23));
-    searchGroup.add(dot);
-    const label = kind === 'closed' ? 'CLOSED' : choice.road_seconds == null ? kind : `+${minutes(choice.road_seconds)} min`;
-    addEdgeLabel(item.node, choice.destination, label, kind);
   }
   scene.add(searchGroup);
+  landmarkGroup.visible = false;
   focusRing.position.copy(point(item.node, 0.15));
   focusRing.scale.setScalar(1.45);
   focusRing.visible = true;
   routeGroup.visible = false;
   bus.visible = false;
   playing = false;
-  $('#map-stage').textContent = `SEARCH ${currentTrace + 1}/${routeData.astar_trace.length} · Checking roads from ${nodeLabel(item.node)}`;
+  $('#map-stage').textContent = `SEARCH ${currentTrace + 1}/${routeData.astar_trace.length} · ${nodeLabel(item.node)}`;
   refreshMapRoles();
-  $('#legend-highlight').classList.add('is-search');
-  $('#legend-label').textContent = 'Road checked now';
   $('#playback-label').textContent = 'Search explores possible roads';
   $('#progress-fill').style.width = `${Math.round((currentTrace + 1) / routeData.astar_trace.length * 100)}%`;
   $('#playback-time').textContent = `${currentTrace + 1}/${routeData.astar_trace.length}`;
@@ -368,16 +358,15 @@ function showFinalRoute(autoplay = true) {
   if (currentTrace !== routeData.astar_trace.length - 1) selectTrace(routeData.astar_trace.length - 1, true);
   stopWalkthrough();
   viewMode = 'route';
+  mapFrame.classList.remove('is-search');
   clearSearchHighlights();
   focusRing.visible = false;
   routeGroup.visible = true;
+  landmarkGroup.visible = true;
   bus.visible = currentPath.length > 0;
   $('#walkthrough-state').textContent = 'FINAL ROUTE';
-  $('#map-stage').textContent = `${displayedMode === 'reliable' ? 'RELIABILITY ROUTE' : 'FINAL FASTEST ROUTE'} · ${nodeLabel(routeData.input.start)} → ${nodeLabel(routeData.input.goal)}`;
+  $('#map-stage').textContent = `${displayedMode === 'reliable' ? 'RELIABLE' : 'FASTEST'} · ${nodeLabel(routeData.input.start)} → ${nodeLabel(routeData.input.goal)}`;
   refreshMapRoles();
-  $('#legend-highlight').classList.remove('is-search');
-  $('#legend-label').textContent = 'Chosen route';
-  for (const step of currentSteps) addEdgeLabel(step.start, step.end, `${minutes(step.seconds)} min`, 'route', 0.25);
   if (autoplay) {
     animationTime = 0;
     playing = currentPath.length > 1;
@@ -428,29 +417,16 @@ function resize() {
   const width = sceneHost.clientWidth, height = sceneHost.clientHeight;
   if (!width || !height) return;
   renderer.setSize(width, height, false);
-  camera.aspect = width / height;
+  const halfHeight = 8.65;
+  const halfWidth = halfHeight * width / height;
+  camera.left = -halfWidth;
+  camera.right = halfWidth;
+  camera.top = halfHeight;
+  camera.bottom = -halfHeight;
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', resize);
 new ResizeObserver(resize).observe(sceneHost);
-let dragging = false, lastX = 0, lastY = 0;
-renderer.domElement.addEventListener('pointerdown', (event) => {
-  dragging = true; lastX = event.clientX; lastY = event.clientY;
-  renderer.domElement.setPointerCapture(event.pointerId);
-});
-renderer.domElement.addEventListener('pointermove', (event) => {
-  if (!dragging) return;
-  orbitAngle -= (event.clientX - lastX) * 0.006;
-  orbitElevation = Math.max(0.30, Math.min(1.48, orbitElevation + (event.clientY - lastY) * 0.005));
-  lastX = event.clientX; lastY = event.clientY;
-  positionCamera();
-});
-renderer.domElement.addEventListener('pointerup', () => { dragging = false; });
-renderer.domElement.addEventListener('wheel', (event) => {
-  event.preventDefault();
-  orbitDistance = Math.max(15, Math.min(39, orbitDistance + event.deltaY * 0.015));
-  positionCamera();
-}, {passive: false});
 const timer = new THREE.Clock();
 function render() {
   requestAnimationFrame(render);
@@ -518,12 +494,11 @@ function selectTrace(index, fromPlayback = false) {
     ? ' The estimate is zero at the destination.'
     : ' Straight-line time is safe: actual roads cannot be shorter or faster.';
   const choices = item.neighbors || [];
-  const queued = choices.filter((choice) => choice.outcome === 'queued').length;
-  const closed = choices.filter((choice) => choice.outcome === 'closed').length;
+  const pending = item.frontier_after || [];
   $('#roads-from').textContent = nodeLabel(item.node).toUpperCase();
   $('#candidate-explanation').textContent = item.node === routeData.input.goal
     ? 'The goal was picked from the queue. No further roads need checking.'
-    : `The h above belongs to ${item.node}. Each destination below gets its own h to ${routeData.input.goal}; new g includes this road, and f = g + h.`;
+    : 'Keep only better arrivals.';
   $('#decision-text').textContent = item.node === routeData.input.goal
     ? `${routeData.input.goal} is the goal. It now has the lowest f, so A* stops and follows saved parent links to recover the route.`
     : !routeData.astar && currentTrace === entries.length - 1
@@ -542,68 +517,67 @@ function selectTrace(index, fromPlayback = false) {
     $('#neighbor-list').appendChild(empty);
   }
   const orderedChoices = [...choices].sort((a, b) =>
+    Number(b.outcome === 'queued') - Number(a.outcome === 'queued') ||
     (a.candidate_f_seconds ?? Infinity) - (b.candidate_f_seconds ?? Infinity));
   for (const choice of orderedChoices) {
     const row = document.createElement('div'); row.className = `neighbor-row candidate-card outcome-${choice.outcome}`;
     const head = document.createElement('div'); head.className = 'candidate-head';
-    const name = document.createElement('strong'); name.textContent = `→ ${nodeLabel(choice.destination)}`;
+    const name = document.createElement('strong'); name.textContent = `${item.node} → ${nodeLabel(choice.destination)}`;
     const outcome = document.createElement('b');
-    outcome.textContent = ({queued: 'Add to queue', closed: 'Closed', settled: 'Already checked', not_better: 'No improvement'})[choice.outcome] || choice.outcome;
+    outcome.textContent = ({queued: 'ADDED', closed: 'CLOSED', settled: 'SKIP', not_better: 'SKIP'})[choice.outcome] || choice.outcome;
     head.append(name, outcome);
     const edge = document.createElement('p'); edge.className = 'candidate-road';
-    edge.textContent = choice.road_seconds == null
-      ? 'This road is closed.'
-      : `Road travel time: +${minutes(choice.road_seconds)} min`;
+    edge.textContent = choice.road_seconds == null ? 'Road closed' : `Road +${minutes(choice.road_seconds)} min`;
     row.append(head, edge);
-    if (choice.candidate_f_seconds != null) {
+    if (choice.outcome === 'queued') {
       const math = document.createElement('div'); math.className = 'candidate-math';
-      const destination = graph.locations.find((location) => location.name === choice.destination);
-      const km = Math.hypot(destination.east_km - goal.east_km, destination.north_km - goal.north_km);
       const metrics = [
-        ['g so far', minutes(choice.candidate_g_seconds), `${minutes(item.g_seconds)} + ${minutes(choice.road_seconds)}`],
-        ['h to goal', minutes(choice.candidate_h_seconds), `${km.toFixed(2)} km ÷ 15 km/h`],
-        ['f priority', minutes(choice.candidate_f_seconds), `${minutes(choice.candidate_g_seconds)} + ${minutes(choice.candidate_h_seconds)}`],
+        ['g so far', minutes(choice.candidate_g_seconds)],
+        [`h to ${routeData.input.goal}`, minutes(choice.candidate_h_seconds)],
+        ['f = g + h', minutes(choice.candidate_f_seconds)],
       ];
-      for (const [label, value, calculation] of metrics) {
-        const metric = document.createElement('div'); metric.className = `candidate-metric ${label === 'f priority' ? 'candidate-total' : ''}`;
+      for (const [label, value] of metrics) {
+        const metric = document.createElement('div'); metric.className = `candidate-metric ${label === 'f = g + h' ? 'candidate-total' : ''}`;
         const title = document.createElement('span'); title.textContent = label;
         const number = document.createElement('strong'); number.textContent = `${value} min`;
-        const work = document.createElement('small'); work.textContent = calculation;
-        metric.append(title, number, work);
+        metric.append(title, number);
         math.appendChild(metric);
       }
       row.appendChild(math);
     }
     const reason = document.createElement('p'); reason.className = 'candidate-reason';
     reason.textContent = choice.outcome === 'queued'
-      ? 'Better arrival → added to queue.'
-      : choice.outcome === 'closed' ? 'No scores are calculated for a blocked road.'
-        : choice.outcome === 'settled' ? 'Already fully explored.'
-          : 'A faster arrival is already known.';
+      ? `${choice.destination} is now waiting to be checked.`
+      : choice.outcome === 'closed' ? 'Cannot use this road.'
+        : choice.outcome === 'settled' ? `${choice.destination} was already checked.`
+          : `A faster arrival at ${choice.destination} is already waiting.`;
     row.appendChild(reason);
     $('#neighbor-list').appendChild(row);
   }
-  const pending = item.frontier_after || [];
   $('#frontier-list').replaceChildren();
-  $('#frontier-list').title = '';
   $('#frontier-next').textContent = pending.length ? `${pending.length} waiting` : 'Queue empty';
+  const next = pending[0];
   $('#next-reason').textContent = item.node === routeData.input.goal
-    ? `The goal was selected. A* is done; its saved parent links give the ${minutes(routeData.astar.travel_seconds)} minute route.`
-    : pending.length
-      ? `Next: ${nodeLabel(pending[0].node)}. Its f = ${minutes(pending[0].f_seconds)} min is the smallest among all ${pending.length} waiting location${pending.length === 1 ? '' : 's'}.`
+    ? `${routeData.input.goal} was selected. Search is complete; the saved route takes ${minutes(routeData.astar.travel_seconds)} min.`
+    : next
+      ? next.via === item.node
+        ? `Next: ${next.node}. Brought here by ${item.node}; its f ${minutes(next.f_seconds)} is the lowest waiting score.`
+        : `Next: ${next.node}. It was found earlier from ${next.via} and is still waiting. Its f ${minutes(next.f_seconds)} is lowest. The shuttle has not moved.`
       : 'Nothing is left waiting, so A* cannot reach the destination from this start.';
-  if (!pending.length) {
+  if (!next) {
     $('#frontier-list').textContent = item.node === routeData.input.goal
       ? 'The chosen path appears in Route evidence.'
       : 'The search has exhausted the reachable part of the map.';
   } else {
-    const other = pending.slice(1);
-    const displayed = other.slice(0, 3).map((candidate) => `${nodeLabel(candidate.node)} (f ${minutes(candidate.f_seconds)})`);
-    $('#frontier-list').textContent = other.length
-      ? `Still waiting: ${displayed.join(', ')}${other.length > 3 ? `, and ${other.length - 3} more` : ''}.`
-      : 'No other locations are waiting.';
-    $('#frontier-list').title = other.map((candidate) =>
-      `${candidate.node}: g ${minutes(candidate.g_seconds)} + h ${minutes(candidate.h_seconds)} = f ${minutes(candidate.f_seconds)}`).join('\n');
+    pending.forEach((candidate, rank) => {
+      const row = document.createElement('div'); row.className = `waiting-row ${rank === 0 ? 'next' : ''}`;
+      const name = document.createElement('strong'); name.textContent = candidate.node;
+      const origin = document.createElement('span'); origin.textContent = `via ${candidate.via || 'start'}`;
+      const arithmetic = document.createElement('small'); arithmetic.textContent = `g ${minutes(candidate.g_seconds)} + h ${minutes(candidate.h_seconds)}`;
+      const score = document.createElement('b'); score.textContent = `f ${minutes(candidate.f_seconds)}`;
+      row.append(name, origin, arithmetic, score);
+      $('#frontier-list').appendChild(row);
+    });
   }
   document.querySelectorAll('#trace-list button').forEach((button, i) => button.classList.toggle('active', i === currentTrace));
   $('#previous-step').disabled = currentTrace === 0;
@@ -654,6 +628,12 @@ function showPath(mode, autoFinal = true) {
 }
 function updateResults() {
   const a = routeData.astar, d = routeData.dijkstra, r = routeData.reliable;
+  const compareQuery = new URLSearchParams({
+    start: routeData.input.start, goal: routeData.input.goal,
+    departure: routeData.input.departure, seed: String(routeData.input.seed),
+  });
+  for (const crossing of routeData.input.closed) compareQuery.append('closed', crossing);
+  $('#compare-link').href = `/compare.html?${compareQuery}`;
   if (!a) {
     $('#show-final').disabled = true;
     $('#replay').disabled = true;

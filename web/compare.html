@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A* vs Dijkstra · RailRoute Lab</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/compare.css">
+</head>
+<body>
+  <main class="compare-shell">
+    <header class="topbar"><a href="/">← Main demo</a><span>RAILROUTE LAB</span></header>
+    <section class="intro">
+      <p class="eyebrow">SAME MAP · SAME START · SAME GOAL</p>
+      <h1>A* versus Dijkstra</h1>
+      <p>Both find the quickest route. <strong>A*</strong> also uses an optimistic estimate of time left, so it may check fewer places.</p>
+      <div class="trip-bar"><strong id="trip-label">Loading trip…</strong><div class="presets"><span>Try:</span><button id="midday" type="button">12:00</button><button id="morning" type="button">08:30</button></div></div>
+    </section>
+    <section class="play-controls" aria-label="Step through both searches"><button id="back" type="button">← Back</button><button id="play" type="button">Play</button><button id="forward" type="button">Next →</button><input id="step" type="range" min="0" max="0" value="0" aria-label="Decision number"><strong id="frame-label">Decision 1</strong></section>
+    <section class="compare-grid" aria-label="Side by side search maps">
+      <article class="method astar"><div class="method-head"><div><span class="eyebrow">GUIDED SEARCH</span><h2>A*</h2><p>Priority = time so far <strong>+</strong> estimated time left</p></div><div class="result"><strong id="astar-count">—</strong><span>places checked</span></div></div><svg id="astar-map" viewBox="0 0 600 420" role="img" aria-label="A star exploration on the road graph"></svg><p id="astar-current" class="current">Loading…</p><p id="astar-path" class="path"></p></article>
+      <article class="method dijkstra"><div class="method-head"><div><span class="eyebrow">UNGUIDED SEARCH</span><h2>Dijkstra</h2><p>Priority = time so far; estimate left is <strong>zero</strong></p></div><div class="result"><strong id="dijkstra-count">—</strong><span>places checked</span></div></div><svg id="dijkstra-map" viewBox="0 0 600 420" role="img" aria-label="Dijkstra exploration on the road graph"></svg><p id="dijkstra-current" class="current">Loading…</p><p id="dijkstra-path" class="path"></p></article>
+    </section>
+    <section class="takeaway"><h2 id="takeaway-title">What to notice</h2><p id="takeaway-text">The colors will show the locations each algorithm has checked.</p><div id="crossing-values" class="crossing-values" hidden></div></section>
+    <p id="compare-error" class="error" hidden></p>
+  </main>
+  <script type="module" src="/compare.js"></script>
+</body>
+</html>

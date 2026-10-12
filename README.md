@@ -10,7 +10,7 @@ Python 3.10+ is sufficient for the core and browser app. Three.js is bundled loc
 python app.py
 ```
 
-Open **http://127.0.0.1:8000**. Choose start, destination, departure time, map seed, and tunnel closures, then select **Run A* search**. The workspace shows exact inputs, a compact animated route map, the A* expansion trace with `g + h = f`, every road considered at the selected expansion, and the Dijkstra comparison. **View source** displays the actual Python search code.
+Open **http://127.0.0.1:8000**. Choose start, destination, departure time, map seed, and tunnel closures, then select **Run A* search**. The workspace shows exact inputs, a compact animated route map, the A* expansion trace with `g + h = f`, every road considered at the selected expansion, and the Dijkstra comparison. **See visual comparison** opens a separate page that plays A* and Dijkstra side by side for the same input. **View source** displays the actual Python search code.
 
 Code-first review examples:
 
@@ -20,6 +20,7 @@ python review_demo.py --time 08:30
 python review_demo.py --close west
 python review_demo.py --start "I" --goal "H" --time 09:59 --seed 42
 python review_demo.py --close west --close east
+python review_demo.py --show-reliability
 python -m unittest -v
 python experiments.py
 ```
@@ -52,7 +53,7 @@ Keep `python app.py` running in a second terminal. The check covers the default 
 
 Each road's progress is integrated through any congestion-period boundary it crosses. This avoids an artificial jump in arrival time for a road entered just before 10:00 or 19:00 and retains the FIFO property required by the label-setting search. Morning peak is 07:00–10:00; evening peak is 16:00–19:00. These periods are experiment assumptions.
 
-`sample_map.py` generates 14 nodes and 17 bidirectional roads. The railway divides north and south; only two graph edges represent road tunnels across it. The seed changes locations, road lengths, speed, congestion, and delay spread while retaining this topology. `app.py` provides the local API and detailed road-cost breakdown. `review_demo.py` prints the algorithm trace directly in the terminal. `demo.py` is a tiny hand-checkable example.
+`sample_map.py` generates 14 nodes and 17 bidirectional roads. The railway divides north and south; only two graph edges represent road tunnels across it. The seed changes locations, road lengths, speed, congestion, and delay spread while retaining this topology. `app.py` provides the local API and detailed road-cost breakdown. `review_demo.py` prints the A* algorithm trace directly in the terminal; add `--show-reliability` only when discussing the optional experiment. `demo.py` is a tiny hand-checkable example.
 
 The optional reliability experiment in `routing.py` enumerates simple paths on this **small** network and chooses the lowest modeled 90th-percentile ETA. It assumes independent, approximately normal road delays, using generated standard deviations. This is a separate objective, not the A* heuristic or the syllabus algorithm. Enumerating all simple paths does not scale to a large network.
 
